@@ -10,7 +10,7 @@ Sistema integrado para validación de declaraciones de importación y facturas.
 - Corrección automática de nombres
 - Detección de inconsistencias
 
-### 🧾 Validación de Facturas
+### 🧾 Validación Datos DIM vs Subpartida FMM
 - Verificación de estructura de archivos Excel
 - Validación de formatos y cálculos
 - Reporte de errores
@@ -20,4 +20,5 @@ Sistema integrado para validación de declaraciones de importación y facturas.
 1. Clonar el repositorio:
 ```bash
 git clone https://github.com/tu-usuario/tu-repositorio.git
+
 cd tu-repositorio
