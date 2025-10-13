@@ -4,4 +4,4 @@ openpyxl
 pdfplumber
 python-dateutil
 numpy
-
+unicodedata2
