@@ -61,6 +61,8 @@ def main():
             st.session_state.anexos_data = None
             st.session_state.reporte_comparacion = None
             st.session_state.reporte_anexos = None
+            st.session_state.datos_dian = None
+            st.session_state.datos_subpartidas = None
             
             # Incrementar el contador para forzar nuevos file uploaders
             st.session_state.uploader_key_counter += 1
@@ -133,6 +135,18 @@ def main():
 
     if not archivos_cargados:
         st.warning("⚠️ Cargue todos los archivos requeridos para continuar")
+        # Mostrar resultados existentes si los hay
+        if 'reporte_comparacion' in st.session_state and st.session_state.reporte_comparacion is not None:
+            st.info("📊 Mostrando resultados de conciliación previa...")
+            mostrar_resultados_en_pantalla({
+                'comparacion': st.session_state.reporte_comparacion is not None,
+                'anexos': st.session_state.reporte_anexos is not None,
+                'datos_dian': st.session_state.datos_dian,
+                'datos_subpartidas': st.session_state.datos_subpartidas,
+                'reporte_comparacion': st.session_state.reporte_comparacion,
+                'reporte_anexos': st.session_state.reporte_anexos
+            })
+            mostrar_botones_descarga()
         return
 
     # Mostrar resumen
@@ -217,14 +231,18 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             st.markdown("============================================================")
             mostrar_resultados_consola_anexos_simplificado(reporte_anexos)
 
-            # Guardar resultados para descarga
+            # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
             with open(output_comparacion, "rb") as f:
                 st.session_state.comparacion_data = f.read()
-                st.session_state.reporte_comparacion = reporte_comparacion
             
             with open(output_anexos, "rb") as f:
                 st.session_state.anexos_data = f.read()
-                st.session_state.reporte_anexos = reporte_anexos
+            
+            # Guardar también los DataFrames completos para mostrar resultados
+            st.session_state.reporte_comparacion = reporte_comparacion
+            st.session_state.reporte_anexos = reporte_anexos
+            st.session_state.datos_dian = datos_dian
+            st.session_state.datos_subpartidas = datos_subpartidas
 
             return {
                 'comparacion': reporte_comparacion is not None,
@@ -340,7 +358,8 @@ def mostrar_resultados_en_pantalla(resultados):
     # Resultados de Comparación DIM vs Subpartidas
     st.subheader("🔍 Comparación DIM vs Subpartidas")
     
-    if resultados['comparacion'] and 'reporte_comparacion' in st.session_state:
+    # Usar datos del session_state para persistencia
+    if 'reporte_comparacion' in st.session_state and st.session_state.reporte_comparacion is not None:
         reporte = st.session_state.reporte_comparacion
         
         # Mostrar resumen estadístico
@@ -390,7 +409,7 @@ def mostrar_resultados_en_pantalla(resultados):
     # Resultados de Validación de Anexos
     st.subheader("📋 Validación de Anexos y Proveedores")
     
-    if resultados['anexos'] and 'reporte_anexos' in st.session_state:
+    if 'reporte_anexos' in st.session_state and st.session_state.reporte_anexos is not None:
         reporte_anexos = st.session_state.reporte_anexos
         
         if reporte_anexos is not None and not reporte_anexos.empty:
@@ -454,13 +473,15 @@ def mostrar_botones_descarga():
     col1, col2 = st.columns(2)
     
     with col1:
-        if 'comparacion_data' in st.session_state:
+        if 'comparacion_data' in st.session_state and st.session_state.comparacion_data is not None:
+            # Usar una key única para el download_button para evitar re-renders
             st.download_button(
                 label="📊 Descargar Comparación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
-                use_container_width=True
+                use_container_width=True,
+                key="download_comparacion"  # Key única
             )
         else:
             st.button(
@@ -470,13 +491,15 @@ def mostrar_botones_descarga():
             )
     
     with col2:
-        if 'anexos_data' in st.session_state:
+        if 'anexos_data' in st.session_state and st.session_state.anexos_data is not None:
+            # Usar una key única para el download_button para evitar re-renders
             st.download_button(
                 label="📋 Descargar Validación Anexos (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_Proveedores.xlsx", 
                 mime="application/vnd.ms-excel",
-                use_container_width=True
+                use_container_width=True,
+                key="download_anexos"  # Key única
             )
         else:
             st.button(
@@ -487,3 +510,4 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
