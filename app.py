@@ -11,28 +11,26 @@ from verificacion_dim import (
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Conciliación DIM vs Subpartidas",
+    page_title="Verificación DIM vs FMM",
     page_icon="📊",
     layout="wide"
 )
 
-# Estilos CSS
+# Estilos CSS sin bordes punteados
 st.markdown("""
 <style>
-    .upload-section {
-        border: 2px dashed #cccccc;
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-        margin: 10px 0;
-        background-color: #f9f9f9;
-    }
     .file-info {
         background-color: #e9ecef;
         border-radius: 5px;
         padding: 8px;
         margin: 5px 0;
         font-size: 14px;
+    }
+    .result-section {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -49,7 +47,7 @@ def main():
         2. **Cargar Excel de Subpartidas**
         3. **Cargar Excel de Anexos/Proveedores** 
         4. **Ejecutar Conciliación**
-        5. **Descargar Resultados**
+        5. **Ver resultados en pantalla y descargar**
         """)
         
         if st.button("🗑️ Limpiar Todo", use_container_width=True):
@@ -61,17 +59,13 @@ def main():
 
     # Declaraciones PDF (DIAN)
     st.subheader("Declaraciones PDF (DIAN)")
-    with st.container():
-        st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-        dian_pdfs = st.file_uploader(
-            "Arrastre y suelte archivos PDF de DIAN aquí",
-            type=['pdf'],
-            accept_multiple_files=True,
-            key="dian_pdfs",
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.caption("Límite: 200 MB por archivo • PDF")
+    dian_pdfs = st.file_uploader(
+        "Arrastre y suelte archivos PDF de DIAN aquí",
+        type=['pdf'],
+        accept_multiple_files=True,
+        key="dian_pdfs"
+    )
+    st.caption("Límite: 200 MB por archivo • PDF")
 
     if dian_pdfs:
         st.markdown("**Archivos cargados:**")
@@ -81,16 +75,12 @@ def main():
 
     # Excel de Subpartidas
     st.subheader("Archivo Excel (Subpartidas)")
-    with st.container():
-        st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-        excel_subpartidas = st.file_uploader(
-            "Arrastre y suelte Excel de subpartidas aquí",
-            type=['xlsx', 'xls'],
-            key="excel_subpartidas",
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.caption("Formatos soportados: XLSX, XLS")
+    excel_subpartidas = st.file_uploader(
+        "Arrastre y suelte Excel de subpartidas aquí",
+        type=['xlsx', 'xls'],
+        key="excel_subpartidas"
+    )
+    st.caption("Formatos soportados: XLSX, XLS")
 
     if excel_subpartidas:
         st.markdown(f'<div class="file-info">📊 {excel_subpartidas.name} ({excel_subpartidas.size / 1024:.1f} KB)</div>', 
@@ -98,16 +88,12 @@ def main():
 
     # Excel de Anexos/Proveedores
     st.subheader("Archivo Excel (Anexos y Proveedores)")
-    with st.container():
-        st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-        excel_anexos = st.file_uploader(
-            "Arrastre y suelte Excel de anexos/proveedores aquí",
-            type=['xlsx', 'xls'],
-            key="excel_anexos", 
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.caption("Formatos soportados: XLSX, XLS")
+    excel_anexos = st.file_uploader(
+        "Arrastre y suelte Excel de anexos/proveedores aquí",
+        type=['xlsx', 'xls'],
+        key="excel_anexos"
+    )
+    st.caption("Formatos soportados: XLSX, XLS")
 
     if excel_anexos:
         st.markdown(f'<div class="file-info">📋 {excel_anexos.name} ({excel_anexos.size / 1024:.1f} KB)</div>', 
@@ -145,7 +131,8 @@ def main():
             
             if resultados:
                 st.success("✅ Conciliación completada exitosamente")
-                mostrar_resultados(resultados)
+                mostrar_resultados_en_pantalla(resultados)
+                mostrar_botones_descarga()
 
 def procesar_conciliacion():
     """Procesa la conciliación con los archivos cargados"""
@@ -171,8 +158,20 @@ def procesar_conciliacion():
             extractor_dian = ExtractorDIANSimplificado()
             datos_dian = extractor_dian.procesar_multiples_dis(temp_dir)
             
+            if datos_dian is None or datos_dian.empty:
+                st.error("❌ No se pudieron extraer datos de los PDFs de DIAN")
+                return None
+            
+            st.success(f"✅ {len(datos_dian)} declaraciones DIAN extraídas")
+            
             extractor_subpartidas = ExtractorSubpartidas()
             datos_subpartidas = extractor_subpartidas.extraer_y_estandarizar(temp_dir)
+            
+            if datos_subpartidas.empty:
+                st.error("❌ No se pudieron extraer datos del archivo de subpartidas")
+                return None
+            
+            st.success(f"✅ Datos de subpartidas extraídos: {len(datos_subpartidas)} registros")
             
             comparador = ComparadorDatos()
             output_comparacion = os.path.join(temp_dir, "comparacion_dim_subpartidas.xlsx")
@@ -190,31 +189,108 @@ def procesar_conciliacion():
             # Guardar resultados para descarga
             with open(output_comparacion, "rb") as f:
                 st.session_state.comparacion_data = f.read()
+                st.session_state.reporte_comparacion = reporte_comparacion
             
             with open(output_anexos, "rb") as f:
                 st.session_state.anexos_data = f.read()
+                st.session_state.reporte_anexos = reporte_anexos
 
             return {
                 'comparacion': reporte_comparacion is not None,
-                'anexos': reporte_anexos is not None
+                'anexos': reporte_anexos is not None,
+                'datos_dian': datos_dian,
+                'datos_subpartidas': datos_subpartidas,
+                'reporte_comparacion': reporte_comparacion,
+                'reporte_anexos': reporte_anexos
             }
 
         except Exception as e:
             st.error(f"❌ Error en el procesamiento: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
             return None
 
-def mostrar_resultados(resultados):
-    """Muestra los resultados y botones de descarga"""
+def mostrar_resultados_en_pantalla(resultados):
+    """Muestra los resultados detallados en pantalla"""
     
     st.markdown("---")
-    st.header("📥 Descargar Resultados")
+    st.header("📊 Resultados de la Conciliación")
+    
+    # Resultados de Comparación DIM vs Subpartidas
+    st.subheader("🔍 Comparación DIM vs Subpartidas")
+    
+    if resultados['comparacion'] and 'reporte_comparacion' in st.session_state:
+        reporte = st.session_state.reporte_comparacion
+        
+        # Mostrar resumen estadístico
+        st.markdown("**Resumen Estadístico:**")
+        
+        di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
+        conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
+        con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total DI procesadas", len(di_individuales))
+        with col2:
+            st.metric("DI conformes", conformes)
+        with col3:
+            st.metric("DI con diferencias", con_diferencias)
+        
+        # Mostrar tabla de resultados
+        st.markdown("**Detalle por Declaración:**")
+        st.dataframe(reporte, use_container_width=True)
+        
+        # Mostrar totales acumulados
+        fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
+        if not fila_totales.empty:
+            st.markdown("**Totales Acumulados:**")
+            st.dataframe(fila_totales, use_container_width=True)
+    else:
+        st.error("No se pudo generar el reporte de comparación")
+
+    # Resultados de Validación de Anexos
+    st.subheader("📋 Validación de Anexos y Proveedores")
+    
+    if resultados['anexos'] and 'reporte_anexos' in st.session_state:
+        reporte_anexos = st.session_state.reporte_anexos
+        
+        if reporte_anexos is not None and not reporte_anexos.empty:
+            # Mostrar resumen de validación
+            st.markdown("**Resumen de Validación:**")
+            
+            total_campos = len(reporte_anexos)
+            coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
+            no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total campos validados", total_campos)
+            with col2:
+                st.metric("Campos correctos", coincidencias)
+            with col3:
+                st.metric("Campos con diferencias", no_coincidencias)
+            
+            # Mostrar tabla de validación
+            st.markdown("**Detalle de Validación:**")
+            st.dataframe(reporte_anexos, use_container_width=True)
+        else:
+            st.info("No hay datos de validación de anexos para mostrar")
+    else:
+        st.error("No se pudo generar el reporte de validación de anexos")
+
+def mostrar_botones_descarga():
+    """Muestra los botones para descargar los Excel"""
+    
+    st.markdown("---")
+    st.header("📥 Descargar Resultados Completos")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if resultados['comparacion'] and 'comparacion_data' in st.session_state:
+        if 'comparacion_data' in st.session_state:
             st.download_button(
-                label="📊 Descargar Comparación DIM vs Subpartidas",
+                label="📊 Descargar Comparación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
@@ -228,9 +304,9 @@ def mostrar_resultados(resultados):
             )
     
     with col2:
-        if resultados['anexos'] and 'anexos_data' in st.session_state:
+        if 'anexos_data' in st.session_state:
             st.download_button(
-                label="📋 Descargar Validación Anexos",
+                label="📋 Descargar Validación Anexos (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_Proveedores.xlsx", 
                 mime="application/vnd.ms-excel",
