@@ -1,24 +1,49 @@
-# Dashboard de Validación de Importaciones
+📊 Sistema de Verificación DIM vs FMM
+📖 Descripción
+Sistema integral de verificación y conciliación entre Declaraciones de Importación (DIM) y Formularios de Movimiento de Mercancías (FMM). Esta aplicación web automatiza el proceso de validación, comparación y análisis de documentos de comercio exterior.
 
-Sistema integrado para validación de declaraciones de importación y facturas.
+🚀 Características Principales
+🔍 Módulos de Verificación
+Comparación DIM vs Subpartida
 
-## 🚀 Características
+Extracción automática de datos de Declaraciones de Importación (PDF)
 
-### 📋 Validación DIM vs Anexos FMM
-- Comparación automática entre Declaraciones de Importación y formularios FMM
-- Validación de campos críticos
-- Corrección automática de nombres
-- Detección de inconsistencias
+Validación contra subpartidas arancelarias
 
-### 🧾 Validación Datos DIM vs Subpartida FMM
-- Verificación de estructura de archivos Excel
-- Validación de formatos y cálculos
-- Reporte de errores
+Detección de discrepancias en campos críticos
 
-## 📦 Instalación Local
+Validación Anexos FMM
 
-1. Clonar el repositorio:
-```bash
-git clone https://github.com/tu-usuario/tu-repositorio.git
+Verificación de consistencia en formularios FMM
 
-cd tu-repositorio
+Validación de anexos y documentos complementarios
+
+Conciliación automática de facturas y referencias
+
+💻 Interfaz de Usuario
+Interfaz intuitiva tipo dashboard
+
+Carga múltiple de archivos PDF y Excel
+
+Visualización en tiempo real de resultados
+
+Exportación de reportes en Excel
+
+Métricas interactivas y resumen estadístico
+
+🛠️ Tecnologías
+Frontend: Streamlit
+
+Procesamiento: Python 3.8+
+
+PDF: pdfplumber
+
+Excel: openpyxl, pandas
+
+Despliegue: Streamlit Cloud / GitHub
+
+📦 Instalación Local
+Prerrequisitos
+Python 3.8 o superior
+
+pip (gestor de paquetes de Python)
