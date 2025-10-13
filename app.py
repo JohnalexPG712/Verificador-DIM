@@ -37,17 +37,9 @@ st.markdown("""
 
 def limpiar_todo():
     """Limpia completamente el estado de la aplicación"""
-    # Lista de todas las claves que queremos limpiar
-    keys_to_clear = [
-        'dian_pdfs', 'excel_subpartidas', 'excel_anexos',
-        'comparacion_data', 'anexos_data', 
-        'reporte_comparacion', 'reporte_anexos'
-    ]
-    
-    # Limpiar cada clave individualmente
-    for key in keys_to_clear:
-        if key in st.session_state:
-            del st.session_state[key]
+    # Limpiar TODAS las claves del session_state
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     
     # Forzar rerun para refrescar los file_uploaders
     st.rerun()
@@ -67,7 +59,7 @@ def main():
         5. **Ver resultados en pantalla y descargar**
         """)
         
-        if st.button("🗑️ Limpiar Todo", use_container_width=True):
+        if st.button("🗑️ Limpiar Todo", use_container_width=True, type="secondary"):
             limpiar_todo()
 
     # Sección de carga de archivos
@@ -195,12 +187,21 @@ def procesar_conciliacion():
                 datos_dian, datos_subpartidas, output_comparacion
             )
 
+            # MOSTRAR RESULTADOS EN CONSOLA - Comparación DIM vs Subpartidas
+            st.markdown("---")
+            st.subheader("📋 Resultados en Consola - Comparación DIM vs Subpartidas")
+            mostrar_resultados_consola_comparacion(reporte_comparacion, datos_dian, datos_subpartidas)
+
             # Procesar validación de anexos
             st.info("📋 Validando anexos y proveedores...")
             
             validador = ValidadorDeclaracionImportacionCompleto()
             output_anexos = os.path.join(temp_dir, "validacion_anexos.xlsx")
             reporte_anexos = validador.procesar_validacion_completa(temp_dir, output_anexos)
+
+            # MOSTRAR RESULTADOS EN CONSOLA - Validación Anexos
+            st.subheader("📋 Resultados en Consola - Validación Anexos")
+            mostrar_resultados_consola_anexos(reporte_anexos)
 
             # Guardar resultados para descarga
             with open(output_comparacion, "rb") as f:
@@ -225,6 +226,81 @@ def procesar_conciliacion():
             import traceback
             st.code(traceback.format_exc())
             return None
+
+def mostrar_resultados_consola_comparacion(reporte_comparacion, datos_dian, datos_subpartidas):
+    """Muestra resultados detallados de la comparación en la consola/interface"""
+    
+    if reporte_comparacion is None or reporte_comparacion.empty:
+        st.error("No hay datos de comparación para mostrar")
+        return
+    
+    # Resumen general
+    st.markdown("**📊 RESUMEN COMPARACIÓN DIM vs SUBPARTIDAS**")
+    
+    di_individuales = reporte_comparacion[reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS']
+    conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
+    con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
+    
+    st.write(f"• Total DI procesadas: {len(di_individuales)}")
+    st.write(f"• DI conformes: {conformes}")
+    st.write(f"• DI con diferencias: {con_diferencias}")
+    
+    # Detalle por DI
+    st.markdown("**🔍 DETALLE POR DECLARACIÓN:**")
+    for _, di in di_individuales.iterrows():
+        numero_di = di['4. Número DI']
+        resultado = di['Resultado verificación']
+        st.write(f"  - DI {numero_di}: {resultado}")
+        
+        # Mostrar campos específicos con problemas si hay diferencias
+        if '❌' in resultado:
+            campos_problema = []
+            for col in di.index:
+                if '❌' in str(di[col]):
+                    campos_problema.append(col)
+            if campos_problema:
+                st.write(f"    Campos con diferencias: {', '.join(campos_problema[:3])}...")
+    
+    # Totales acumulados
+    fila_totales = reporte_comparacion[reporte_comparacion['4. Número DI'] == 'VALORES ACUMULADOS']
+    if not fila_totales.empty:
+        st.markdown("**💰 TOTALES ACUMULADOS:**")
+        total_di = fila_totales.iloc[0]
+        st.write(f"• Resultado totales: {total_di['Resultado verificación']}")
+
+def mostrar_resultados_consola_anexos(reporte_anexos):
+    """Muestra resultados detallados de la validación de anexos en la consola/interface"""
+    
+    if reporte_anexos is None or reporte_anexos.empty:
+        st.info("No hay datos de validación de anexos para mostrar")
+        return
+    
+    # Resumen general
+    st.markdown("**📋 RESUMEN VALIDACIÓN ANEXOS**")
+    
+    total_campos = len(reporte_anexos)
+    coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
+    no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
+    
+    st.write(f"• Total campos validados: {total_campos}")
+    st.write(f"• Campos correctos: {coincidencias}")
+    st.write(f"• Campos con diferencias: {no_coincidencias}")
+    
+    # Agrupar por DI
+    st.markdown("**📄 DETALLE POR DECLARACIÓN:**")
+    di_unicos = reporte_anexos['Numero DI'].unique()
+    
+    for di in di_unicos:
+        datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
+        correctos = len(datos_di[datos_di['Coincidencias'] == '✅ COINCIDE'])
+        incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
+        
+        st.write(f"  - DI {di}: {correctos}✓ / {incorrectos}✗")
+        
+        # Mostrar campos específicos con problemas
+        if incorrectos > 0:
+            campos_incorrectos = datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE']['Campos DI a Validar'].tolist()
+            st.write(f"    Campos incorrectos: {', '.join(campos_incorrectos)}")
 
 def mostrar_resultados_en_pantalla(resultados):
     """Muestra los resultados detallados en pantalla"""
