@@ -11,7 +11,7 @@ from verificacion_dim import (
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Verificación DIM vs FMM",
+    page_title="Conciliación DIM vs Subpartidas",
     page_icon="📊",
     layout="wide"
 )
@@ -35,6 +35,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def limpiar_todo():
+    """Limpia completamente el estado de la aplicación"""
+    # Lista de todas las claves que queremos limpiar
+    keys_to_clear = [
+        'dian_pdfs', 'excel_subpartidas', 'excel_anexos',
+        'comparacion_data', 'anexos_data', 
+        'reporte_comparacion', 'reporte_anexos'
+    ]
+    
+    # Limpiar cada clave individualmente
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Forzar rerun para refrescar los file_uploaders
+    st.rerun()
+
 def main():
     # Header principal
     st.title("Sistema de Conciliación de Declaraciones de Importación")
@@ -51,8 +68,7 @@ def main():
         """)
         
         if st.button("🗑️ Limpiar Todo", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+            limpiar_todo()
 
     # Sección de carga de archivos
     st.header("Cargar Archivos")
@@ -321,3 +337,4 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
