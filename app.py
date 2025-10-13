@@ -358,15 +358,32 @@ def mostrar_resultados_en_pantalla(resultados):
         with col3:
             st.metric("DI con diferencias", con_diferencias)
         
-        # Mostrar tabla de resultados
+        # Mostrar tabla de resultados con resaltado SOLO para diferencias
         st.markdown("**Detalle por Declaración:**")
-        st.dataframe(reporte, use_container_width=True)
+        
+        # Aplicar estilos para resaltar SOLO filas con diferencias
+        def resaltar_solo_diferencias(row):
+            """Resalta SOLO filas que tienen diferencias (❌)"""
+            if '❌' in str(row['Resultado verificación']):
+                return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
+            else:
+                return [''] * len(row)  # Sin resaltado para conformes
+        
+        # Aplicar el estilo
+        styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
+        
+        # Mostrar la tabla con estilos
+        st.dataframe(styled_reporte, use_container_width=True)
         
         # Mostrar totales acumulados
         fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
         if not fila_totales.empty:
             st.markdown("**Totales Acumulados:**")
             st.dataframe(fila_totales, use_container_width=True)
+            
+            # Resaltar también los totales si hay diferencias
+            if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
+                st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
     else:
         st.error("No se pudo generar el reporte de comparación")
 
@@ -392,9 +409,37 @@ def mostrar_resultados_en_pantalla(resultados):
             with col3:
                 st.metric("Campos con diferencias", no_coincidencias)
             
-            # Mostrar tabla de validación
+            # Mostrar tabla de validación con resaltado SOLO para diferencias
             st.markdown("**Detalle de Validación:**")
-            st.dataframe(reporte_anexos, use_container_width=True)
+            
+            def resaltar_solo_validacion_anexos(row):
+                """Resalta SOLO filas que no coinciden en la validación de anexos"""
+                if row['Coincidencias'] == '❌ NO COINCIDE':
+                    return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
+                else:
+                    return [''] * len(row)  # Sin resaltado para coincidencias
+            
+            # Aplicar el estilo
+            styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
+            
+            st.dataframe(styled_anexos, use_container_width=True)
+            
+            # Mostrar resumen por DI para anexos - SOLO mostrar las que requieren atención
+            st.markdown("**Declaraciones que Requieren Atención:**")
+            di_unicos = reporte_anexos['Numero DI'].unique()
+            di_con_problemas = []
+            
+            for di in di_unicos:
+                datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
+                incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
+                
+                if incorrectos > 0:
+                    di_con_problemas.append(di)
+                    st.error(f"DI {di}: {incorrectos} campo(s) con diferencias - **REQUIERE ATENCIÓN**")
+            
+            if not di_con_problemas:
+                st.success("✅ Todas las declaraciones están conformes")
+                    
         else:
             st.info("No hay datos de validación de anexos para mostrar")
     else:
