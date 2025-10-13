@@ -35,14 +35,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def limpiar_todo():
-    """Limpia completamente el estado de la aplicación"""
-    # Limpiar TODAS las claves del session_state
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    
-    # Forzar rerun para refrescar los file_uploaders
-    st.rerun()
+# Inicializar contador para file uploaders si no existe
+if 'uploader_key_counter' not in st.session_state:
+    st.session_state.uploader_key_counter = 0
 
 def main():
     # Header principal
@@ -59,11 +54,28 @@ def main():
         5. **Ver resultados en pantalla y descargar**
         """)
         
-        if st.button("🗑️ Limpiar Todo", use_container_width=True, type="secondary"):
-            limpiar_todo()
+        # Botón de limpieza - EXACTAMENTE COMO TU LÓGICA FUNCIONA
+        if st.button("🗑️ Limpiar Todo", type="secondary", use_container_width=True):
+            # Limpiar todo el estado específico
+            st.session_state.comparacion_data = None
+            st.session_state.anexos_data = None
+            st.session_state.reporte_comparacion = None
+            st.session_state.reporte_anexos = None
+            
+            # Incrementar el contador para forzar nuevos file uploaders
+            st.session_state.uploader_key_counter += 1
+            
+            # Mensaje de confirmación
+            st.sidebar.success("✅ Todo ha sido limpiado. Puedes cargar nuevos archivos.")
+            
+            # Forzar actualización sin recargar toda la página
+            st.rerun()
 
     # Sección de carga de archivos
     st.header("Cargar Archivos")
+
+    # Usar el contador como parte de la key para forzar reset - CLAVE ÚNICA
+    current_key = st.session_state.uploader_key_counter
 
     # Declaraciones PDF (DIAN)
     st.subheader("Declaraciones PDF (DIAN)")
@@ -71,7 +83,7 @@ def main():
         "Arrastre y suelte archivos PDF de DIAN aquí",
         type=['pdf'],
         accept_multiple_files=True,
-        key="dian_pdfs"
+        key=f"dian_pdfs_{current_key}"
     )
     st.caption("Límite: 200 MB por archivo • PDF")
 
@@ -86,7 +98,7 @@ def main():
     excel_subpartidas = st.file_uploader(
         "Arrastre y suelte Excel de subpartidas aquí",
         type=['xlsx', 'xls'],
-        key="excel_subpartidas"
+        key=f"excel_subpartidas_{current_key}"
     )
     st.caption("Formatos soportados: XLSX, XLS")
 
@@ -99,7 +111,7 @@ def main():
     excel_anexos = st.file_uploader(
         "Arrastre y suelte Excel de anexos/proveedores aquí",
         type=['xlsx', 'xls'],
-        key="excel_anexos"
+        key=f"excel_anexos_{current_key}"
     )
     st.caption("Formatos soportados: XLSX, XLS")
 
@@ -114,9 +126,9 @@ def main():
 
     # Verificar archivos mínimos
     archivos_cargados = (
-        st.session_state.get('dian_pdfs') and 
-        st.session_state.get('excel_subpartidas') and
-        st.session_state.get('excel_anexos')
+        dian_pdfs and 
+        excel_subpartidas and
+        excel_anexos
     )
 
     if not archivos_cargados:
@@ -126,39 +138,39 @@ def main():
     # Mostrar resumen
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("PDFs DIAN", len(st.session_state.dian_pdfs))
+        st.metric("PDFs DIAN", len(dian_pdfs))
     with col2:
-        st.metric("Excel Subpartidas", "✓" if st.session_state.excel_subpartidas else "✗")
+        st.metric("Excel Subpartidas", "✓" if excel_subpartidas else "✗")
     with col3:
-        st.metric("Excel Anexos", "✓" if st.session_state.excel_anexos else "✗")
+        st.metric("Excel Anexos", "✓" if excel_anexos else "✗")
 
     # Botón de procesamiento
     if st.button("🔄 Ejecutar Conciliación", type="primary", use_container_width=True):
         with st.spinner("Procesando conciliación..."):
-            resultados = procesar_conciliacion()
+            resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
             
             if resultados:
                 st.success("✅ Conciliación completada exitosamente")
                 mostrar_resultados_en_pantalla(resultados)
                 mostrar_botones_descarga()
 
-def procesar_conciliacion():
+def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
     """Procesa la conciliación con los archivos cargados"""
     
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             # Guardar archivos en temporal
-            for pdf in st.session_state.dian_pdfs:
+            for pdf in dian_pdfs:
                 with open(os.path.join(temp_dir, pdf.name), "wb") as f:
                     f.write(pdf.getbuffer())
             
-            excel_sub_path = os.path.join(temp_dir, st.session_state.excel_subpartidas.name)
+            excel_sub_path = os.path.join(temp_dir, excel_subpartidas.name)
             with open(excel_sub_path, "wb") as f:
-                f.write(st.session_state.excel_subpartidas.getbuffer())
+                f.write(excel_subpartidas.getbuffer())
             
-            excel_anexos_path = os.path.join(temp_dir, st.session_state.excel_anexos.name)  
+            excel_anexos_path = os.path.join(temp_dir, excel_anexos.name)  
             with open(excel_anexos_path, "wb") as f:
-                f.write(st.session_state.excel_anexos.getbuffer())
+                f.write(excel_anexos.getbuffer())
 
             # Procesar comparación DIM vs Subpartidas
             st.info("🔍 Comparando DIM vs Subpartidas...")
