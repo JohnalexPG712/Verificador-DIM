@@ -35,11 +35,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Inicializar contador para file uploaders si no existe
-if 'uploader_key_counter' not in st.session_state:
-    st.session_state.uploader_key_counter = 0
+# Inicializar estados de sesión si no existen
+def inicializar_estados():
+    if 'uploader_key_counter' not in st.session_state:
+        st.session_state.uploader_key_counter = 0
+    if 'procesamiento_completado' not in st.session_state:
+        st.session_state.procesamiento_completado = False
+    if 'download_counter' not in st.session_state:
+        st.session_state.download_counter = 0
+    # Estados para los datos
+    if 'comparacion_data' not in st.session_state:
+        st.session_state.comparacion_data = None
+    if 'anexos_data' not in st.session_state:
+        st.session_state.anexos_data = None
+    if 'reporte_comparacion' not in st.session_state:
+        st.session_state.reporte_comparacion = None
+    if 'reporte_anexos' not in st.session_state:
+        st.session_state.reporte_anexos = None
+    if 'datos_dian' not in st.session_state:
+        st.session_state.datos_dian = None
+    if 'datos_subpartidas' not in st.session_state:
+        st.session_state.datos_subpartidas = None
 
 def main():
+    inicializar_estados()
+    
     # Header principal
     st.title("Sistema de Conciliación de Declaraciones de Importación")
     
@@ -54,7 +74,7 @@ def main():
         5. **Ver resultados en pantalla y descargar**
         """)
         
-        # Botón de limpieza - EXACTAMENTE COMO TU LÓGICA FUNCIONA
+        # Botón de limpieza
         if st.button("🗑️ Limpiar Todo", type="secondary", use_container_width=True):
             # Limpiar todo el estado específico
             st.session_state.comparacion_data = None
@@ -63,20 +83,22 @@ def main():
             st.session_state.reporte_anexos = None
             st.session_state.datos_dian = None
             st.session_state.datos_subpartidas = None
+            st.session_state.procesamiento_completado = False
             
             # Incrementar el contador para forzar nuevos file uploaders
             st.session_state.uploader_key_counter += 1
+            st.session_state.download_counter += 1
             
             # Mensaje de confirmación
             st.sidebar.success("✅ Todo ha sido limpiado. Puedes cargar nuevos archivos.")
             
-            # Forzar actualización sin recargar toda la página
+            # Forzar actualización
             st.rerun()
 
     # Sección de carga de archivos
     st.header("Cargar Archivos")
 
-    # Usar el contador como parte de la key para forzar reset - CLAVE ÚNICA
+    # Usar el contador como parte de la key para forzar reset
     current_key = st.session_state.uploader_key_counter
 
     # Declaraciones PDF (DIAN)
@@ -126,27 +148,30 @@ def main():
     # Proceso de conciliación
     st.header("Proceso: Conciliación")
 
-    # Verificar archivos mínimos
-    archivos_cargados = (
-        dian_pdfs and 
-        excel_subpartidas and
-        excel_anexos
-    )
+    # Verificar archivos mínimos para nuevo procesamiento
+    archivos_cargados = (dian_pdfs and excel_subpartidas and excel_anexos)
 
+    # Mostrar resultados existentes si los hay
+    if st.session_state.procesamiento_completado and st.session_state.reporte_comparacion is not None:
+        st.info("📊 Mostrando resultados de conciliación previa. Puedes descargar los archivos o cargar nuevos para reprocesar.")
+        mostrar_resultados_en_pantalla()
+        mostrar_botones_descarga()
+        
+        # Mostrar botón para nuevo procesamiento si hay archivos cargados
+        if archivos_cargados:
+            st.markdown("---")
+            st.subheader("Reprocesar con nuevos archivos")
+            if st.button("🔄 Ejecutar Nueva Conciliación", type="primary", use_container_width=True):
+                with st.spinner("Procesando nueva conciliación..."):
+                    resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
+                    if resultados:
+                        st.success("✅ Nueva conciliación completada exitosamente")
+                        st.rerun()
+        return
+
+    # Si no hay resultados previos, procesar normalmente
     if not archivos_cargados:
         st.warning("⚠️ Cargue todos los archivos requeridos para continuar")
-        # Mostrar resultados existentes si los hay
-        if 'reporte_comparacion' in st.session_state and st.session_state.reporte_comparacion is not None:
-            st.info("📊 Mostrando resultados de conciliación previa...")
-            mostrar_resultados_en_pantalla({
-                'comparacion': st.session_state.reporte_comparacion is not None,
-                'anexos': st.session_state.reporte_anexos is not None,
-                'datos_dian': st.session_state.datos_dian,
-                'datos_subpartidas': st.session_state.datos_subpartidas,
-                'reporte_comparacion': st.session_state.reporte_comparacion,
-                'reporte_anexos': st.session_state.reporte_anexos
-            })
-            mostrar_botones_descarga()
         return
 
     # Mostrar resumen
@@ -164,9 +189,9 @@ def main():
             resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
             
             if resultados:
+                st.session_state.procesamiento_completado = True
                 st.success("✅ Conciliación completada exitosamente")
-                mostrar_resultados_en_pantalla(resultados)
-                mostrar_botones_descarga()
+                st.rerun()
 
 def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
     """Procesa la conciliación con los archivos cargados"""
@@ -349,8 +374,8 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos):
     st.markdown("========================================================================================================================")
     st.markdown("   • Validación de anexos completada")
 
-def mostrar_resultados_en_pantalla(resultados):
-    """Muestra los resultados detallados en pantalla"""
+def mostrar_resultados_en_pantalla():
+    """Muestra los resultados detallados en pantalla usando session_state"""
     
     st.markdown("---")
     st.header("📊 Resultados de la Conciliación")
@@ -358,8 +383,7 @@ def mostrar_resultados_en_pantalla(resultados):
     # Resultados de Comparación DIM vs Subpartidas
     st.subheader("🔍 Comparación DIM vs Subpartidas")
     
-    # Usar datos del session_state para persistencia
-    if 'reporte_comparacion' in st.session_state and st.session_state.reporte_comparacion is not None:
+    if st.session_state.reporte_comparacion is not None:
         reporte = st.session_state.reporte_comparacion
         
         # Mostrar resumen estadístico
@@ -409,7 +433,7 @@ def mostrar_resultados_en_pantalla(resultados):
     # Resultados de Validación de Anexos
     st.subheader("📋 Validación de Anexos y Proveedores")
     
-    if 'reporte_anexos' in st.session_state and st.session_state.reporte_anexos is not None:
+    if st.session_state.reporte_anexos is not None:
         reporte_anexos = st.session_state.reporte_anexos
         
         if reporte_anexos is not None and not reporte_anexos.empty:
@@ -473,15 +497,16 @@ def mostrar_botones_descarga():
     col1, col2 = st.columns(2)
     
     with col1:
-        if 'comparacion_data' in st.session_state and st.session_state.comparacion_data is not None:
-            # Usar una key única para el download_button para evitar re-renders
+        if st.session_state.comparacion_data is not None:
+            # Usar una key única dinámica basada en el contador
+            download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
             st.download_button(
                 label="📊 Descargar Comparación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
-                key="download_comparacion"  # Key única
+                key=download_key_comp
             )
         else:
             st.button(
@@ -491,15 +516,16 @@ def mostrar_botones_descarga():
             )
     
     with col2:
-        if 'anexos_data' in st.session_state and st.session_state.anexos_data is not None:
-            # Usar una key única para el download_button para evitar re-renders
+        if st.session_state.anexos_data is not None:
+            # Usar una key única dinámica basada en el contador
+            download_key_anex = f"download_anexos_{st.session_state.download_counter}"
             st.download_button(
                 label="📋 Descargar Validación Anexos (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_Proveedores.xlsx", 
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
-                key="download_anexos"  # Key única
+                key=download_key_anex
             )
         else:
             st.button(
@@ -510,4 +536,3 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
-
