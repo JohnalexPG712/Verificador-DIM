@@ -380,7 +380,17 @@ def mostrar_resultados_en_pantalla():
     st.markdown("---")
     st.header("📊 Resultados de la Conciliación")
     
-    # Resultados de Comparación DIM vs Subpartidas
+    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
+    if st.session_state.reporte_comparacion is not None:
+        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
+        st.markdown("============================================================")
+        mostrar_resultados_consola_comparacion_simplificado(
+            st.session_state.reporte_comparacion, 
+            st.session_state.datos_dian, 
+            st.session_state.datos_subpartidas
+        )
+    
+    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA
     st.subheader("🔍 Comparación DIM vs Subpartidas")
     
     if st.session_state.reporte_comparacion is not None:
@@ -430,7 +440,13 @@ def mostrar_resultados_en_pantalla():
     else:
         st.error("No se pudo generar el reporte de comparación")
 
-    # Resultados de Validación de Anexos
+    # MOSTRAR RESUMEN EN CONSOLA - Validación Anexos
+    if st.session_state.reporte_anexos is not None:
+        st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
+        st.markdown("============================================================")
+        mostrar_resultados_consola_anexos_simplificado(st.session_state.reporte_anexos)
+
+    # Resultados de Validación de Anexos - TABLA DETALLADA
     st.subheader("📋 Validación de Anexos y Proveedores")
     
     if st.session_state.reporte_anexos is not None:
@@ -536,3 +552,4 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
