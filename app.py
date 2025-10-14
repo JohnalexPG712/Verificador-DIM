@@ -317,62 +317,126 @@ def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, dat
     st.markdown("============================================================")
 
 def mostrar_resultados_consola_anexos_simplificado(reporte_anexos):
-    """Muestra resultados simplificados de la validación de anexos sin detalle por declaración"""
+    """Muestra resultados simplificados de la validación de anexos usando datos reales"""
     
     if reporte_anexos is None or reporte_anexos.empty:
         st.info("No hay datos de validación de anexos para mostrar")
         return
     
-    # Información básica del proveedor (simulada - ajusta según tu implementación real)
+    # Información básica del proveedor - EXTRAER DEL REPORTE REAL
     st.markdown("👤 **Extrayendo información del proveedor...**")
-    st.markdown("📋 **Información encontrada: Proveedor/Cliente: 1144024407 - LUZ VERONICA QUINTERO GOMEZ**")
-    st.markdown("✅ **PROVEEDOR VÁLIDO:**")
-    st.markdown("   🆔 NIT: 1144024407")
-    st.markdown("   📛 Nombre: LUZ VERONICA QUINTERO GOMEZ")
     
-    # Resumen por código (simulado - ajusta según tu implementación real)
-    st.markdown("📊 **Resumen por código:**")
-    st.markdown("   • Código 6: 1 - FACTURA COMERCIAL")
-    st.markdown("   • Código 9: 42 - DECLARACION DE IMPORTACION")
-    st.markdown("   • Código 17: 1 - DOCUMENTO DE TRANSPORTE")
-    st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
-    st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
+    # Intentar extraer información real del proveedor del reporte
+    # (ajusta estas columnas según la estructura real de tu reporte)
+    if 'Proveedor' in reporte_anexos.columns or 'NIT' in reporte_anexos.columns:
+        # Extraer información del primer registro como ejemplo
+        primer_registro = reporte_anexos.iloc[0]
+        nit_proveedor = primer_registro.get('NIT', 'No disponible')
+        nombre_proveedor = primer_registro.get('Nombre_Proveedor', 'No disponible')
+        
+        st.markdown(f"📋 **Información encontrada: Proveedor/Cliente: {nit_proveedor} - {nombre_proveedor}**")
+        st.markdown("✅ **PROVEEDOR VÁLIDO:**")
+        st.markdown(f"   🆔 NIT: {nit_proveedor}")
+        st.markdown(f"   📛 Nombre: {nombre_proveedor}")
+    else:
+        st.markdown("📋 **Información del proveedor: No disponible en el reporte**")
     
-    # Validación de integridad (simulada)
+    # Resumen por código - CALCULAR DE FORMA REAL
+    st.markdown("📊 **Resumen por tipo de documento:**")
+    
+    # Contar tipos de documentos si existe la columna correspondiente
+    if 'Tipo_Documento' in reporte_anexos.columns:
+        resumen_tipos = reporte_anexos['Tipo_Documento'].value_counts()
+        for tipo, cantidad in resumen_tipos.items():
+            st.markdown(f"   • {tipo}: {cantidad}")
+    elif 'Codigo_Documento' in reporte_anexos.columns:
+        resumen_codigos = reporte_anexos['Codigo_Documento'].value_counts()
+        for codigo, cantidad in resumen_codigos.items():
+            nombre_doc = obtener_nombre_documento(codigo)  # Función auxiliar si existe
+            st.markdown(f"   • Código {codigo}: {cantidad} - {nombre_doc}")
+    else:
+        # Si no hay columnas específicas, mostrar resumen general
+        total_documentos = len(reporte_anexos)
+        st.markdown(f"   • Total documentos procesados: {total_documentos}")
+    
+    # Validación de integridad - CALCULAR DE FORMA REAL
     st.markdown("🔍 **VALIDACIÓN DE INTEGRIDAD:**")
-    st.markdown("   ❌ 1 Levantes duplicados: 882025000132736")
-    st.markdown("   ❌ Desbalance: 42 DI vs 43 Levantes")
+    
+    # Contar DI únicas vs documentos
+    if 'Numero DI' in reporte_anexos.columns:
+        di_unicas = reporte_anexos['Numero DI'].nunique()
+        total_documentos = len(reporte_anexos)
+        
+        # Buscar duplicados
+        if 'Numero_Documento' in reporte_anexos.columns:
+            duplicados = reporte_anexos[reporte_anexos.duplicated(['Numero_Documento'], keep=False)]
+            if not duplicados.empty:
+                docs_duplicados = duplicados['Numero_Documento'].unique()[:3]  # Mostrar solo primeros 3
+                st.markdown(f"   ❌ {len(duplicados)} documentos duplicados: {', '.join(map(str, docs_duplicados))}...")
+            else:
+                st.markdown("   ✅ No se encontraron documentos duplicados")
+        
+        # Verificar balance DI vs documentos
+        if di_unicas != total_documentos:
+            st.markdown(f"   ⚠️ Desbalance: {di_unicas} DI vs {total_documentos} Documentos")
+        else:
+            st.markdown("   ✅ Balance correcto entre DI y documentos")
+    else:
+        st.markdown("   ℹ️ No hay datos suficientes para validación de integridad")
     
     st.markdown("==================================================")
     st.markdown("📊 **RESUMEN FINAL DE VALIDACIÓN**")
     st.markdown("==================================================")
     
-    # Calcular estadísticas reales
-    di_unicos = reporte_anexos['Numero DI'].unique()
-    total_declaraciones = len(di_unicos)
-    
-    # Contar declaraciones con errores (simplificado)
-    declaraciones_con_errores = 0
-    for di in di_unicos:
-        datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
-        incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
-        if incorrectos > 0:
-            declaraciones_con_errores += 1
-    
-    declaraciones_correctas = total_declaraciones - declaraciones_con_errores
-    
-    st.write(f"   • Total declaraciones procesadas: {total_declaraciones}")
-    st.write(f"   • Declaraciones con errores: {declaraciones_con_errores}")
-    st.write(f"   • Declaraciones correctas: {declaraciones_correctas}")
-    
-    if declaraciones_con_errores == 0:
-        st.markdown(f"🎯 **TODAS LAS {total_declaraciones} DECLARACIONES SON CORRECTAS ✅**")
+    # Calcular estadísticas reales de coincidencias
+    if 'Coincidencias' in reporte_anexos.columns:
+        total_campos = len(reporte_anexos)
+        coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
+        no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
+        
+        st.write(f"   • Total campos validados: {total_campos}")
+        st.write(f"   • Campos correctos: {coincidencias}")
+        st.write(f"   • Campos con diferencias: {no_coincidencias}")
+        
+        # Calcular por DI
+        if 'Numero DI' in reporte_anexos.columns:
+            di_unicos = reporte_anexos['Numero DI'].unique()
+            declaraciones_con_errores = 0
+            
+            for di in di_unicos:
+                datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
+                incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
+                if incorrectos > 0:
+                    declaraciones_con_errores += 1
+            
+            declaraciones_correctas = len(di_unicos) - declaraciones_con_errores
+            
+            st.write(f"   • Total declaraciones procesadas: {len(di_unicos)}")
+            st.write(f"   • Declaraciones con errores: {declaraciones_con_errores}")
+            st.write(f"   • Declaraciones correctas: {declaraciones_correctas}")
+            
+            if declaraciones_con_errores == 0:
+                st.markdown(f"🎯 **TODAS LAS {len(di_unicos)} DECLARACIONES SON CORRECTAS ✅**")
+            else:
+                st.markdown(f"⚠️ **{declaraciones_con_errores} DECLARACIONES REQUIEREN ATENCIÓN**")
     else:
-        st.markdown(f"⚠️ **{declaraciones_con_errores} DECLARACIONES REQUIEREN ATENCIÓN**")
+        st.markdown("   ℹ️ No hay datos de coincidencias para mostrar resumen")
     
     st.markdown("🎯 **PROCESO COMPLETADO EXITOSAMENTE**")
     st.markdown("========================================================================================================================")
     st.markdown("   • Validación de anexos completada")
+
+# Función auxiliar para obtener nombres de documentos (opcional)
+def obtener_nombre_documento(codigo):
+    """Convierte códigos de documento a nombres legibles"""
+    nombres = {
+        '6': 'FACTURA COMERCIAL',
+        '9': 'DECLARACION DE IMPORTACION', 
+        '17': 'DOCUMENTO DE TRANSPORTE',
+        '47': 'AUTORIZACION DE LEVANTE',
+        '93': 'FORMULARIO DE SALIDA ZONA FRANCA'
+    }
+    return nombres.get(str(codigo), f'DOCUMENTO {codigo}')
 
 def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state"""
@@ -552,4 +616,5 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
