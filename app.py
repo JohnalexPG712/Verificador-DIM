@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import re
 import tempfile
 from verificacion_dim import (
     ExtractorDIANSimplificado,
@@ -865,3 +866,4 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
