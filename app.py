@@ -831,7 +831,7 @@ def mostrar_botones_descarga():
             # Usar una key única dinámica basada en el contador
             download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
             st.download_button(
-                label="📥 Descargar Comparación DIM vs Subpartidas (Excel)",
+                label="📥 Descargar Validación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
@@ -850,7 +850,7 @@ def mostrar_botones_descarga():
             # Usar una key única dinámica basada en el contador
             download_key_anex = f"download_anexos_{st.session_state.download_counter}"
             st.download_button(
-                label="📥 Descargar Validación Anexos (Excel)",
+                label="📥 Descargar Comparación Anexos FMM (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_FMM.xlsx", 
                 mime="application/vnd.ms-excel",
@@ -866,6 +866,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
