@@ -142,9 +142,9 @@ def main():
                    unsafe_allow_html=True)
 
     # Excel de Anexos/Proveedores
-    st.subheader("Archivo Excel (Anexos y Proveedores)")
+    st.subheader("Archivo Excel (Anexos FMM)")
     excel_anexos = st.file_uploader(
-        "Arrastre y suelte Excel de anexos/proveedores aquí",
+        "Arrastre y suelte Excel de anexos FMM aquí",
         type=['xlsx', 'xls'],
         key=f"excel_anexos_{current_key}"
     )
@@ -197,7 +197,7 @@ def main():
     # Botón de procesamiento
     if st.button("🔄 Ejecutar Verificación", type="primary", use_container_width=True):
         with st.spinner("Procesando verificación..."):
-            resultados = procesar_verificación(dian_pdfs, excel_subpartidas, excel_anexos)
+            resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
             
             if resultados:
                 st.session_state.procesamiento_completado = True
@@ -229,7 +229,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             datos_dian = extractor_dian.procesar_multiples_dis(temp_dir)
             
             if datos_dian is None or datos_dian.empty:
-                st.error("❌ No se pudieron extraer datos de los PDFs de DIM")
+                st.error("❌ No se pudieron extraer datos de las DIM")
                 return None
             
             st.success(f"✅ {len(datos_dian)} declaraciones DIAN extraídas")
@@ -866,5 +866,6 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
