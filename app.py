@@ -590,9 +590,6 @@ def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, dat
 def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
     """Muestra resultados simplificados de la validación de anexos en el formato específico"""
     
-    st.markdown("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
-    st.markdown("============================================================")
-    
     # Información del proveedor
     st.markdown("👤 Extrayendo información del proveedor...")
     
@@ -666,6 +663,8 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
     st.markdown(f"📋 Declaraciones encontradas: {total_di_anexos}")
     st.markdown(f"📋 {total_di_dian} declaraciones procesadas de {total_di_anexos} encontradas en anexos")
     st.markdown(f"🔍 Validando {total_di_dian} declaraciones...")
+    
+    # NOTA: EL RESUMEN FINAL SE MUESTRA SOLO UNA VEZ EN mostrar_resultados_en_pantalla()
     
     st.markdown("==================================================")
     st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
@@ -963,6 +962,8 @@ def mostrar_resultados_en_pantalla():
     if st.session_state.reporte_anexos is not None:
         st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
         st.markdown("============================================================")
+        
+        # Mostrar solo los resultados de consola sin el resumen final duplicado
         mostrar_resultados_consola_anexos_simplificado(
             st.session_state.reporte_anexos,
             st.session_state.datos_proveedor,
@@ -1099,6 +1100,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
