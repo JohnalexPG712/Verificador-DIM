@@ -629,7 +629,7 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
         st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
     
-        # Validación de integridad
+    # Validación de integridad
     st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
     
     if estadisticas_validacion:
@@ -647,7 +647,7 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
                 # Obtener datos DIAN del session_state
                 datos_dian_actual = st.session_state.get('datos_dian')
                 analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
-                if "❌" in analisis_desbalance:
+                if analisis_desbalance:
                     st.markdown("   🔍 **Análisis detallado del desbalance:**")
                     lineas = analisis_desbalance.split('\n')
                     for linea in lineas:
@@ -658,6 +658,14 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
     else:
         st.markdown("   ❌ 1 Levantes duplicados: 882025000132736")
         st.markdown("   ❌ Desbalance: 42 DI vs 43 Levantes")
+    
+    # Información de declaraciones - MOSTRAR COMPARACIÓN ENTRE DIAN Y ANEXOS
+    total_di_dian = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
+    total_di_anexos = estadisticas_validacion.get('total_di', 0) if estadisticas_validacion else 0
+    
+    st.markdown(f"📋 Declaraciones encontradas: {total_di_anexos}")
+    st.markdown(f"📋 {total_di_dian} declaraciones procesadas de {total_di_anexos} encontradas en anexos")
+    st.markdown(f"🔍 Validando {total_di_dian} declaraciones...")
     
     st.markdown("==================================================")
     st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
@@ -685,11 +693,13 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
     
     st.markdown("🎯 PROCESO COMPLETADO EXITOSAMENTE")
     st.markdown("========================================================================================================================")
-        # Validación de integridad
+    
+       # Validación de integridad
     st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
     
     if estadisticas_validacion:
-        if 'levantes_duplicados' in estadisticas_validacion and estadisticas_validacion['levantes_duplicados']:
+        # SOLO MOSTRAR LEVANTES DUPLICADOS SI NO HAY DESBALANCE (para evitar duplicación)
+        if 'levantes_duplicados' in estadisticas_validacion and estadisticas_validacion['levantes_duplicados'] and not estadisticas_validacion.get('desbalance_di_levantes', False):
             st.markdown(f"   ❌ {len(estadisticas_validacion['levantes_duplicados'])} Levantes duplicados: {', '.join(estadisticas_validacion['levantes_duplicados'][:1])}")
         
         if 'desbalance_di_levantes' in estadisticas_validacion and estadisticas_validacion['desbalance_di_levantes']:
@@ -697,12 +707,12 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
             levantes_count = estadisticas_validacion.get('total_levantes', 43)
             st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
             
-            # MOSTRAR ANÁLISIS DETALLADO DEL DESBALANCE
+            # MOSTRAR ANÁLISIS DETALLADO DEL DESBALANCE (solo una vez)
             if reporte_anexos is not None:
                 # Obtener datos DIAN del session_state
                 datos_dian_actual = st.session_state.get('datos_dian')
                 analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
-                if "❌" in analisis_desbalance:
+                if analisis_desbalance:
                     st.markdown("   🔍 **Análisis detallado del desbalance:**")
                     lineas = analisis_desbalance.split('\n')
                     for linea in lineas:
@@ -750,7 +760,8 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
         # Extraer números de DI del reporte de anexos (código 9 - Declaraciones de Importación)
         di_anexos = set()
         levantes_anexos = set()
-        levantes_duplicados = []
+        levantes_duplicados_info = []  # Para guardar información detallada de duplicados
+        di_duplicados_info = []        # Para guardar información detallada de DI duplicadas
         
         if 'Numero DI' in reporte_anexos.columns and 'Campos DI a Validar' in reporte_anexos.columns and 'Datos Formulario' in reporte_anexos.columns:
             
@@ -761,32 +772,68 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
                 (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
             ]
             
-            # Extraer números de levante del campo 'Datos Formulario'
-            numeros_levante = []
+            # Extraer números de levante del campo 'Datos Formulario' con su DI correspondiente
+            levantes_con_di = []
             for idx, fila in campos_levante.iterrows():
+                numero_di = str(fila['Numero DI']).strip()
                 dato_formulario = str(fila['Datos Formulario']).strip()
                 # Si es un número válido (no "NO ENCONTRADO" y es numérico)
                 if (dato_formulario != "NO ENCONTRADO" and 
                     dato_formulario and 
-                    dato_formulario.isdigit()):
-                    numeros_levante.append(dato_formulario)
+                    dato_formulario.isdigit() and
+                    numero_di != "nan"):
+                    levantes_con_di.append({
+                        'di': numero_di,
+                        'levante': dato_formulario
+                    })
             
-            # Encontrar levantes duplicados
+            # Encontrar levantes duplicados (mismo número de levante)
             from collections import Counter
+            numeros_levante = [item['levante'] for item in levantes_con_di]
             conteo_levantes = Counter(numeros_levante)
-            levantes_duplicados = [levante for levante, count in conteo_levantes.items() if count > 1]
+            levantes_duplicados_numeros = [levante for levante, count in conteo_levantes.items() if count > 1]
             
-            # Extraer DI de declaraciones (132. No. Aceptación Declaración)
-            di_anexos = set(reporte_anexos[
+            # Para cada levante duplicado, encontrar las DI asociadas
+            for levante_duplicado in levantes_duplicados_numeros:
+                di_asociadas = [item['di'] for item in levantes_con_di if item['levante'] == levante_duplicado]
+                levantes_duplicados_info.append(f"Levante {levante_duplicado} en DI: {', '.join(di_asociadas)}")
+            
+            # EXTRAER Y ANALIZAR DI DUPLICADAS
+            # Buscar en los campos de declaración (132. No. Aceptación Declaración)
+            campos_declaracion = reporte_anexos[
                 (reporte_anexos['Campos DI a Validar'].str.contains('132. No. Aceptación Declaración', na=False)) |
                 (reporte_anexos['Campos DI a Validar'].str.contains('Aceptación Declaración', na=False))
-            ]['Numero DI'].dropna().unique())
+            ]
             
-            # Extraer DI de levantes (134. Levante No.)
-            levantes_anexos = set(reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('134. Levante No.', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
-            ]['Numero DI'].dropna().unique())
+            # Extraer números de declaración del campo 'Datos Formulario' con su DI correspondiente
+            declaraciones_con_di = []
+            for idx, fila in campos_declaracion.iterrows():
+                numero_di = str(fila['Numero DI']).strip()
+                dato_formulario = str(fila['Datos Formulario']).strip()
+                # Si es un número válido (no "NO ENCONTRADO")
+                if (dato_formulario != "NO ENCONTRADO" and 
+                    dato_formulario and 
+                    numero_di != "nan"):
+                    declaraciones_con_di.append({
+                        'di': numero_di,
+                        'declaracion': dato_formulario
+                    })
+            
+            # Encontrar DI duplicadas (mismo número de DI con diferentes números de declaración)
+            from collections import defaultdict
+            di_por_declaracion = defaultdict(list)
+            for item in declaraciones_con_di:
+                di_por_declaracion[item['di']].append(item['declaracion'])
+            
+            for di, declaraciones in di_por_declaracion.items():
+                if len(declaraciones) > 1:
+                    di_duplicados_info.append(f"DI {di} con declaraciones: {', '.join(declaraciones)}")
+            
+            # Extraer DI de declaraciones para análisis de balance
+            di_anexos = set([item['di'] for item in declaraciones_con_di])
+            
+            # Extraer DI de levantes para análisis de balance
+            levantes_anexos = set([item['di'] for item in levantes_con_di])
         
         # Extraer números de DI de los datos DIAN
         if datos_dian is not None and not datos_dian.empty and '4. Número DI' in datos_dian.columns:
@@ -812,6 +859,14 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
         if di_sobrantes_anexos:
             mensaje.append(f"❌ **DI SOBRANTES en anexos ({len(di_sobrantes_anexos)}):** {', '.join(sorted(list(di_sobrantes_anexos))[:3])}{'...' if len(di_sobrantes_anexos) > 3 else ''}")
         
+        # Información de DI duplicadas
+        if di_duplicados_info:
+            mensaje.append(f"❌ **DI DUPLICADAS ({len(di_duplicados_info)}):**")
+            for info in di_duplicados_info[:3]:  # Mostrar máximo 3 ejemplos
+                mensaje.append(f"      {info}")
+            if len(di_duplicados_info) > 3:
+                mensaje.append(f"      ... y {len(di_duplicados_info) - 3} más")
+        
         # Información de Autorizaciones de Levante
         if levantes_faltantes:
             mensaje.append(f"❌ **LEVANTES FALTANTES ({len(levantes_faltantes)}):** {', '.join(sorted(list(levantes_faltantes))[:3])}{'...' if len(levantes_faltantes) > 3 else ''}")
@@ -819,9 +874,13 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
         if levantes_sobrantes:
             mensaje.append(f"❌ **LEVANTES SOBRANTES ({len(levantes_sobrantes)}):** {', '.join(sorted(list(levantes_sobrantes))[:3])}{'...' if len(levantes_sobrantes) > 3 else ''}")
         
-        # MOSTRAR LEVANTES DUPLICADOS CORRECTAMENTE (números reales de levante)
-        if levantes_duplicados:
-            mensaje.append(f"❌ **LEVANTES DUPLICADOS ({len(levantes_duplicados)}):** {', '.join(sorted(levantes_duplicados)[:5])}{'...' if len(levantes_duplicados) > 5 else ''}")
+        # MOSTRAR LEVANTES DUPLICADOS CORRECTAMENTE con información detallada
+        if levantes_duplicados_info:
+            mensaje.append(f"❌ **LEVANTES DUPLICADOS ({len(levantes_duplicados_numeros)}):**")
+            for info in levantes_duplicados_info[:3]:  # Mostrar máximo 3 ejemplos
+                mensaje.append(f"      {info}")
+            if len(levantes_duplicados_info) > 3:
+                mensaje.append(f"      ... y {len(levantes_duplicados_info) - 3} más")
         
         # Resumen de conteos
         mensaje.append(f"📊 **RESUMEN:** DIAN: {len(di_dian)} DI | Anexos: {len(di_anexos)} DI / {len(levantes_anexos)} Levantes")
@@ -838,11 +897,11 @@ def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state"""
     
     st.markdown("---")
-    st.header("📈 Resultados de la Verificación")
+    st.header("📊 Resultados de la Conciliación")
     
-    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
+    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas (SOLO UNA VEZ)
     if st.session_state.reporte_comparacion is not None:
-        st.subheader("▶️ EJECUTANDO: Comparación DIM vs Subpartida")
+        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
         st.markdown("============================================================")
         mostrar_resultados_consola_comparacion_simplificado(
             st.session_state.reporte_comparacion, 
@@ -900,9 +959,9 @@ def mostrar_resultados_en_pantalla():
     else:
         st.error("No se pudo generar el reporte de comparación")
 
-    # MOSTRAR RESUMEN EN CONSOLA - Validación Anexos
+    # MOSTRAR RESUMEN EN CONSOLA - Validación Anexos (SOLO UNA VEZ)
     if st.session_state.reporte_anexos is not None:
-        st.subheader("▶️ EJECUTANDO: Validación Anexos FMM vs DIM")
+        st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
         st.markdown("============================================================")
         mostrar_resultados_consola_anexos_simplificado(
             st.session_state.reporte_anexos,
@@ -968,6 +1027,29 @@ def mostrar_resultados_en_pantalla():
             st.info("No hay datos de validación de anexos para mostrar")
     else:
         st.error("No se pudo generar el reporte de validación de anexos")
+    
+    # MOSTRAR RESUMEN FINAL SOLO UNA VEZ (eliminar la duplicación)
+    st.markdown("==================================================")
+    st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
+    st.markdown("==================================================")
+    
+    # Calcular estadísticas finales
+    total_di_dian = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
+    total_di_anexos = st.session_state.estadisticas_validacion.get('total_di', 0) if st.session_state.estadisticas_validacion else 0
+    declaraciones_errores = st.session_state.estadisticas_validacion.get('declaraciones_con_errores', 0) if st.session_state.estadisticas_validacion else 0
+    declaraciones_correctas = total_di_dian - declaraciones_errores
+    
+    st.write(f"   • Total declaraciones procesadas: {total_di_dian} de {total_di_anexos} encontradas en anexos")
+    st.write(f"   • Declaraciones con errores: {declaraciones_errores}")
+    st.write(f"   • Declaraciones correctas: {declaraciones_correctas}")
+    
+    if declaraciones_errores == 0:
+        st.markdown(f"🎯 TODAS LAS {total_di_dian} DECLARACIONES SON CORRECTAS ✅")
+    else:
+        st.markdown(f"⚠️ {declaraciones_errores} DECLARACIONES REQUIEREN ATENCIÓN")
+    
+    st.markdown("🎯 PROCESO COMPLETADO EXITOSAMENTE")
+    st.markdown("========================================================================================================================")
 
 def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
@@ -1017,6 +1099,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
