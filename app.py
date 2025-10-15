@@ -138,7 +138,7 @@ def main():
     st.caption("Formatos soportados: XLSX, XLS")
 
     if excel_subpartidas:
-        st.markdown(f'<div class="file-info">📊 {excel_subpartidas.name} ({excel_subpartidas.size / 1024:.1f} KB)</div>', 
+        st.markdown(f'<div class="file-info">📋 {excel_subpartidas.name} ({excel_subpartidas.size / 1024:.1f} KB)</div>', 
                    unsafe_allow_html=True)
 
     # Excel de Anexos/Proveedores
@@ -251,7 +251,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
 
             # MOSTRAR RESULTADOS EN CONSOLA - Comparación DIM vs Subpartidas (VERSIÓN SIMPLIFICADA)
             st.markdown("---")
-            st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
+            st.subheader("📈 EJECUTANDO: Comparación DIM vs Subpartida")
             st.markdown("============================================================")
             mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas)
 
@@ -563,7 +563,7 @@ def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, dat
     
     # Mostrar información de extracción
     st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIM)...**")
-    st.markdown("📊 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
+    st.markdown("📄 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
     st.write(f"✅ Datos DIM extraídos: {len(datos_dian)} registros")
     st.write(f"✅ Datos Subpartidas extraídos: {len(datos_subpartidas)} registros")
     
@@ -613,7 +613,7 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown(f"✅ {total_anexos} anexos encontrados")
     
     # Resumen por código
-    st.markdown("📊 Resumen por código:")
+    st.markdown("📈 Resumen por código:")
     
     if resumen_codigos:
         for codigo, info in resumen_codigos.items():
@@ -657,7 +657,7 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown("🔍 Validando 42 declaraciones...")
     
     st.markdown("==================================================")
-    st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
+    st.markdown("📈 RESUMEN FINAL DE VALIDACIÓN")
     st.markdown("==================================================")
     
     # Resumen final
@@ -687,11 +687,11 @@ def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state"""
     
     st.markdown("---")
-    st.header("📊 Resultados de la Verificación")
+    st.header("📈 Resultados de la Verificación")
     
     # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
     if st.session_state.reporte_comparacion is not None:
-        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
+        st.subheader("▶️ EJECUTANDO: Comparación DIM vs Subpartida")
         st.markdown("============================================================")
         mostrar_resultados_consola_comparacion_simplificado(
             st.session_state.reporte_comparacion, 
@@ -751,7 +751,7 @@ def mostrar_resultados_en_pantalla():
 
     # MOSTRAR RESUMEN EN CONSOLA - Validación Anexos
     if st.session_state.reporte_anexos is not None:
-        st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
+        st.subheader("▶️ EJECUTANDO: Validación Anexos FMM vs DIM")
         st.markdown("============================================================")
         mostrar_resultados_consola_anexos_simplificado(
             st.session_state.reporte_anexos,
@@ -831,7 +831,7 @@ def mostrar_botones_descarga():
             # Usar una key única dinámica basada en el contador
             download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
             st.download_button(
-                label="📊 Descargar Comparación DIM vs Subpartidas (Excel)",
+                label="📥 Descargar Comparación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
@@ -850,7 +850,7 @@ def mostrar_botones_descarga():
             # Usar una key única dinámica basada en el contador
             download_key_anex = f"download_anexos_{st.session_state.download_counter}"
             st.download_button(
-                label="📋 Descargar Validación Anexos (Excel)",
+                label="📥 Descargar Validación Anexos (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_FMM.xlsx", 
                 mime="application/vnd.ms-excel",
@@ -866,6 +866,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
