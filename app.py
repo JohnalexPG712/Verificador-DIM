@@ -12,8 +12,8 @@ from verificacion_dim import (
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Conciliación DIM vs Subpartidas",
-    page_icon="📊",
+    page_title="Aplicación de Verificación DIM vs FMM",
+    page_icon="🚀",
     layout="wide"
 )
 
@@ -69,7 +69,7 @@ def main():
     inicializar_estados()
     
     # Header principal
-    st.title("Sistema de Conciliación de Declaraciones de Importación")
+    st.title("🚢 Aplicación de Verificación DIM vs FMM")
     
     # Instrucciones en sidebar
     with st.sidebar:
@@ -77,13 +77,13 @@ def main():
         st.markdown("""
         1. **Cargar Declaraciones PDF** (DIAN)
         2. **Cargar Excel de Subpartidas**
-        3. **Cargar Excel de Anexos/Proveedores** 
-        4. **Ejecutar Conciliación**
+        3. **Cargar Excel de Anexos FMM** 
+        4. **Ejecutar Verificación**
         5. **Ver resultados en pantalla y descargar**
         """)
         
         # Botón de limpieza
-        if st.button("🗑️ Limpiar Todo", type="secondary", use_container_width=True):
+        if st.button("🧹 Limpiar Todo y Reiniciar", type="secondary", use_container_width=True):
             # Limpiar todo el estado específico
             st.session_state.comparacion_data = None
             st.session_state.anexos_data = None
@@ -164,7 +164,7 @@ def main():
 
     # Mostrar resultados existentes si los hay
     if st.session_state.procesamiento_completado and st.session_state.reporte_comparacion is not None:
-        st.info("📊 Mostrando resultados de conciliación previa. Puedes descargar los archivos o cargar nuevos para reprocesar.")
+        st.info("📈 Mostrando resultados de conciliación previa. Puedes descargar los archivos o cargar nuevos para reprocesar.")
         mostrar_resultados_en_pantalla()
         mostrar_botones_descarga()
         
@@ -172,11 +172,11 @@ def main():
         if archivos_cargados:
             st.markdown("---")
             st.subheader("Reprocesar con nuevos archivos")
-            if st.button("🔄 Ejecutar Nueva Conciliación", type="primary", use_container_width=True):
-                with st.spinner("Procesando nueva conciliación..."):
-                    resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
+            if st.button("🔄 Ejecutar Nueva Verificación", type="primary", use_container_width=True):
+                with st.spinner("Procesando nueva verificación..."):
+                    resultados = procesar_verificación(dian_pdfs, excel_subpartidas, excel_anexos)
                     if resultados:
-                        st.success("✅ Nueva conciliación completada exitosamente")
+                        st.success("✅ Nueva verificación completada exitosamente")
                         st.rerun()
         return
 
@@ -195,13 +195,13 @@ def main():
         st.metric("Excel Anexos", "✓" if excel_anexos else "✗")
 
     # Botón de procesamiento
-    if st.button("🔄 Ejecutar Conciliación", type="primary", use_container_width=True):
-        with st.spinner("Procesando conciliación..."):
-            resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
+    if st.button("🔄 Ejecutar Verificación", type="primary", use_container_width=True):
+        with st.spinner("Procesando verificación..."):
+            resultados = procesar_verificación(dian_pdfs, excel_subpartidas, excel_anexos)
             
             if resultados:
                 st.session_state.procesamiento_completado = True
-                st.success("✅ Conciliación completada exitosamente")
+                st.success("✅ Verificación completada exitosamente")
                 st.rerun()
 
 def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
@@ -229,7 +229,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             datos_dian = extractor_dian.procesar_multiples_dis(temp_dir)
             
             if datos_dian is None or datos_dian.empty:
-                st.error("❌ No se pudieron extraer datos de los PDFs de DIAN")
+                st.error("❌ No se pudieron extraer datos de los PDFs de DIM")
                 return None
             
             st.success(f"✅ {len(datos_dian)} declaraciones DIAN extraídas")
@@ -256,7 +256,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas)
 
             # Procesar validación de anexos
-            st.info("📋 Validando anexos y proveedores...")
+            st.info("📋 Validando anexos FMM...")
             
             validador = ValidadorDeclaracionImportacionCompleto()
             output_anexos = os.path.join(temp_dir, "validacion_anexos.xlsx")
@@ -562,9 +562,9 @@ def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, dat
         return
     
     # Mostrar información de extracción
-    st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIAN)...**")
+    st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIM)...**")
     st.markdown("📊 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
-    st.write(f"✅ Datos DIAN extraídos: {len(datos_dian)} registros")
+    st.write(f"✅ Datos DIM extraídos: {len(datos_dian)} registros")
     st.write(f"✅ Datos Subpartidas extraídos: {len(datos_subpartidas)} registros")
     
     # Resumen estadístico
@@ -687,7 +687,7 @@ def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state"""
     
     st.markdown("---")
-    st.header("📊 Resultados de la Conciliación")
+    st.header("📊 Resultados de la Verificación")
     
     # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
     if st.session_state.reporte_comparacion is not None:
@@ -852,7 +852,7 @@ def mostrar_botones_descarga():
             st.download_button(
                 label="📋 Descargar Validación Anexos (Excel)",
                 data=st.session_state.anexos_data,
-                file_name="Validacion_Anexos_Proveedores.xlsx", 
+                file_name="Validacion_Anexos_FMM.xlsx", 
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
                 key=download_key_anex
@@ -866,4 +866,5 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
