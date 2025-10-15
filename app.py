@@ -629,11 +629,12 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
         st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
     
-    # Validación de integridad
+        # Validación de integridad
     st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
     
     if estadisticas_validacion:
-        if 'levantes_duplicados' in estadisticas_validacion and estadisticas_validacion['levantes_duplicados']:
+        # SOLO MOSTRAR LEVANTES DUPLICADOS SI NO HAY DESBALANCE (para evitar duplicación)
+        if 'levantes_duplicados' in estadisticas_validacion and estadisticas_validacion['levantes_duplicados'] and not estadisticas_validacion.get('desbalance_di_levantes', False):
             st.markdown(f"   ❌ {len(estadisticas_validacion['levantes_duplicados'])} Levantes duplicados: {', '.join(estadisticas_validacion['levantes_duplicados'][:1])}")
         
         if 'desbalance_di_levantes' in estadisticas_validacion and estadisticas_validacion['desbalance_di_levantes']:
@@ -641,9 +642,11 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
             levantes_count = estadisticas_validacion.get('total_levantes', 43)
             st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
             
-            # MOSTRAR ANÁLISIS DETALLADO DEL DESBALANCE
+            # MOSTRAR ANÁLISIS DETALLADO DEL DESBALANCE (solo una vez)
             if reporte_anexos is not None:
-                analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, estadisticas_validacion.get('datos_dian'))  # datos_dian se pasa después
+                # Obtener datos DIAN del session_state
+                datos_dian_actual = st.session_state.get('datos_dian')
+                analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
                 if "❌" in analisis_desbalance:
                     st.markdown("   🔍 **Análisis detallado del desbalance:**")
                     lineas = analisis_desbalance.split('\n')
@@ -655,17 +658,6 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
     else:
         st.markdown("   ❌ 1 Levantes duplicados: 882025000132736")
         st.markdown("   ❌ Desbalance: 42 DI vs 43 Levantes")
-    
-    # Información de declaraciones
-    if estadisticas_validacion and 'total_di' in estadisticas_validacion:
-        total_di = estadisticas_validacion['total_di']
-        st.markdown(f"📋 Declaraciones encontradas: {total_di}")
-        st.markdown(f"📋 {total_di} declaraciones encontradas")
-        st.markdown(f"🔍 Validando {total_di} declaraciones...")
-    else:
-        st.markdown("📋 Declaraciones encontradas: 42")
-        st.markdown("📋 42 declaraciones encontradas")
-        st.markdown("🔍 Validando 42 declaraciones...")
     
     st.markdown("==================================================")
     st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
@@ -756,24 +748,45 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
     
     try:
         # Extraer números de DI del reporte de anexos (código 9 - Declaraciones de Importación)
-        if 'Numero DI' in reporte_anexos.columns:
-            # Filtrar solo las declaraciones de importación (código 9)
-            di_anexos = set(reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('Aceptación Declaración', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('132.', na=False))
-            ]['Numero DI'].dropna().unique())
-        else:
-            return "No se encontró la columna 'Numero DI' en los anexos"
+        di_anexos = set()
+        levantes_anexos = set()
+        levantes_duplicados = []
         
-        # Extraer números de Levante del reporte de anexos (código 47 - Autorizaciones de Levante)
-        if 'Numero DI' in reporte_anexos.columns:
-            # Filtrar solo las autorizaciones de levante (código 47)
-            levantes_anexos = set(reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('Levante', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('134.', na=False))
+        if 'Numero DI' in reporte_anexos.columns and 'Campos DI a Validar' in reporte_anexos.columns and 'Datos Formulario' in reporte_anexos.columns:
+            
+            # EXTRAER NÚMEROS REALES DE LEVANTE DEL CAMPO 'Datos Formulario'
+            # Buscar en los campos de levante (134. Levante No.)
+            campos_levante = reporte_anexos[
+                (reporte_anexos['Campos DI a Validar'].str.contains('134. Levante No.', na=False)) |
+                (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
+            ]
+            
+            # Extraer números de levante del campo 'Datos Formulario'
+            numeros_levante = []
+            for idx, fila in campos_levante.iterrows():
+                dato_formulario = str(fila['Datos Formulario']).strip()
+                # Si es un número válido (no "NO ENCONTRADO" y es numérico)
+                if (dato_formulario != "NO ENCONTRADO" and 
+                    dato_formulario and 
+                    dato_formulario.isdigit()):
+                    numeros_levante.append(dato_formulario)
+            
+            # Encontrar levantes duplicados
+            from collections import Counter
+            conteo_levantes = Counter(numeros_levante)
+            levantes_duplicados = [levante for levante, count in conteo_levantes.items() if count > 1]
+            
+            # Extraer DI de declaraciones (132. No. Aceptación Declaración)
+            di_anexos = set(reporte_anexos[
+                (reporte_anexos['Campos DI a Validar'].str.contains('132. No. Aceptación Declaración', na=False)) |
+                (reporte_anexos['Campos DI a Validar'].str.contains('Aceptación Declaración', na=False))
             ]['Numero DI'].dropna().unique())
-        else:
-            levantes_anexos = set()
+            
+            # Extraer DI de levantes (134. Levante No.)
+            levantes_anexos = set(reporte_anexos[
+                (reporte_anexos['Campos DI a Validar'].str.contains('134. Levante No.', na=False)) |
+                (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
+            ]['Numero DI'].dropna().unique())
         
         # Extraer números de DI de los datos DIAN
         if datos_dian is not None and not datos_dian.empty and '4. Número DI' in datos_dian.columns:
@@ -789,47 +802,24 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
         levantes_faltantes = di_dian - levantes_anexos  # DI que deberían tener levante pero no lo tienen
         levantes_sobrantes = levantes_anexos - di_dian  # Levantes para DI que no existen
         
-        # Analizar duplicados en anexos para DI
-        if 'Numero DI' in reporte_anexos.columns:
-            # Duplicados en Declaraciones de Importación
-            di_anexos_data = reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('Aceptación Declaración', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('132.', na=False))
-            ]
-            conteo_di_anexos = di_anexos_data['Numero DI'].value_counts()
-            di_duplicados = conteo_di_anexos[conteo_di_anexos > 1].index.tolist()
-            
-            # Duplicados en Autorizaciones de Levante
-            levantes_anexos_data = reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('Levante', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('134.', na=False))
-            ]
-            conteo_levantes_anexos = levantes_anexos_data['Numero DI'].value_counts()
-            levantes_duplicados = conteo_levantes_anexos[conteo_levantes_anexos > 1].index.tolist()
-        else:
-            di_duplicados = []
-            levantes_duplicados = []
-        
         # Construir mensaje detallado
         mensaje = []
         
         # Información de Declaraciones de Importación (DI)
         if di_faltantes_anexos:
-            mensaje.append(f"❌ **DI FALTANTES en anexos ({len(di_faltantes_anexos)}):** {', '.join(sorted(list(di_faltantes_anexos))[:5])}{'...' if len(di_faltantes_anexos) > 5 else ''}")
+            mensaje.append(f"❌ **DI FALTANTES en anexos ({len(di_faltantes_anexos)}):** {', '.join(sorted(list(di_faltantes_anexos))[:3])}{'...' if len(di_faltantes_anexos) > 3 else ''}")
         
         if di_sobrantes_anexos:
-            mensaje.append(f"❌ **DI SOBRANTES en anexos ({len(di_sobrantes_anexos)}):** {', '.join(sorted(list(di_sobrantes_anexos))[:5])}{'...' if len(di_sobrantes_anexos) > 5 else ''}")
-        
-        if di_duplicados:
-            mensaje.append(f"❌ **DI DUPLICADAS en anexos ({len(di_duplicados)}):** {', '.join(sorted(di_duplicados)[:5])}{'...' if len(di_duplicados) > 5 else ''}")
+            mensaje.append(f"❌ **DI SOBRANTES en anexos ({len(di_sobrantes_anexos)}):** {', '.join(sorted(list(di_sobrantes_anexos))[:3])}{'...' if len(di_sobrantes_anexos) > 3 else ''}")
         
         # Información de Autorizaciones de Levante
         if levantes_faltantes:
-            mensaje.append(f"❌ **LEVANTES FALTANTES ({len(levantes_faltantes)}):** {', '.join(sorted(list(levantes_faltantes))[:5])}{'...' if len(levantes_faltantes) > 5 else ''}")
+            mensaje.append(f"❌ **LEVANTES FALTANTES ({len(levantes_faltantes)}):** {', '.join(sorted(list(levantes_faltantes))[:3])}{'...' if len(levantes_faltantes) > 3 else ''}")
         
         if levantes_sobrantes:
-            mensaje.append(f"❌ **LEVANTES SOBRANTES ({len(levantes_sobrantes)}):** {', '.join(sorted(list(levantes_sobrantes))[:5])}{'...' if len(levantes_sobrantes) > 5 else ''}")
+            mensaje.append(f"❌ **LEVANTES SOBRANTES ({len(levantes_sobrantes)}):** {', '.join(sorted(list(levantes_sobrantes))[:3])}{'...' if len(levantes_sobrantes) > 3 else ''}")
         
+        # MOSTRAR LEVANTES DUPLICADOS CORRECTAMENTE (números reales de levante)
         if levantes_duplicados:
             mensaje.append(f"❌ **LEVANTES DUPLICADOS ({len(levantes_duplicados)}):** {', '.join(sorted(levantes_duplicados)[:5])}{'...' if len(levantes_duplicados) > 5 else ''}")
         
@@ -1027,6 +1017,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
