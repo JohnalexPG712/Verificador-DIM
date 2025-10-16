@@ -65,6 +65,8 @@ def inicializar_estados():
         st.session_state.resumen_codigos = None
     if 'estadisticas_validacion' not in st.session_state:
         st.session_state.estadisticas_validacion = None
+    if 'validacion_integridad' not in st.session_state:
+        st.session_state.validacion_integridad = None
 
 def main():
     inicializar_estados()
@@ -95,6 +97,7 @@ def main():
             st.session_state.datos_proveedor = None
             st.session_state.resumen_codigos = None
             st.session_state.estadisticas_validacion = None
+            st.session_state.validacion_integridad = None
             st.session_state.procesamiento_completado = False
             
             # Incrementar el contador para forzar nuevos file uploaders
@@ -366,13 +369,40 @@ def extraer_datos_de_consola(consola_output):
     return datos
 
 def extraer_resumen_de_consola(consola_output):
-    """Extrae resumen de códigos de la salida de consola"""
+    """Extrae resumen de códigos Y validación de integridad de la salida de consola"""
     resumen = {}
+    validacion_integridad = {}
     
     lineas = consola_output.split('\n')
     en_resumen = False
+    en_validacion = False
     
     for linea in lineas:
+        # Capturar VALIDACIÓN DE INTEGRIDAD
+        if 'VALIDACIÓN DE INTEGRIDAD:' in linea or 'VALIDACION DE INTEGRIDAD:' in linea:
+            en_validacion = True
+            continue
+        
+        if en_validacion:
+            if '❌' in linea or '✅' in linea:
+                if 'Levantes duplicados:' in linea:
+                    match = re.search(r'❌\s*(\d+)\s*Levantes duplicados:\s*([0-9]+)', linea)
+                    if match:
+                        validacion_integridad['levantes_duplicados'] = {
+                            'cantidad': match.group(1),
+                            'numero': match.group(2)
+                        }
+                elif 'Desbalance:' in linea:
+                    match = re.search(r'❌\s*Desbalance:\s*(\d+)\s*DI\s*vs\s*(\d+)\s*Levantes', linea)
+                    if match:
+                        validacion_integridad['desbalance'] = {
+                            'di': match.group(1),
+                            'levantes': match.group(2)
+                        }
+            elif not linea.strip() or '📋 Declaraciones encontradas:' in linea:
+                en_validacion = False
+        
+        # Capturar RESUMEN POR CÓDIGO (existente)
         if 'Resumen por código:' in linea:
             en_resumen = True
             continue
@@ -387,6 +417,10 @@ def extraer_resumen_de_consola(consola_output):
         
         if en_resumen and not linea.strip().startswith('•'):
             en_resumen = False
+    
+    # Guardar validación de integridad en session_state para usarla después
+    if validacion_integridad:
+        st.session_state.validacion_integridad = validacion_integridad
     
     return resumen
 
@@ -440,109 +474,6 @@ def extraer_estadisticas_de_consola(consola_output, datos_dian):
     return estadisticas
 
 # FUNCIONES AUXILIARES MEJORADAS
-def analizar_desbalance_anexos(reporte_anexos, datos_dian):
-    """Analiza específicamente el desbalance entre DI (Código 9) y Levantes (Código 47)"""
-    
-    try:
-        # Contadores y listas para análisis real
-        codigo_9_count = 0
-        codigo_47_count = 0
-        levantes_info = []
-        declaraciones_info = []
-        
-        # EXTRAER DATOS REALES DE LOS ANEXOS
-        if 'Campos DI a Validar' in reporte_anexos.columns and 'Datos Formulario' in reporte_anexos.columns:
-            
-            # Buscar Declaraciones de Importación (Código 9)
-            declaraciones = reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('132. No. Aceptación Declaración', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('Aceptación Declaración', na=False))
-            ]
-            codigo_9_count = len(declaraciones)
-            
-            # Extraer números reales de declaración
-            for idx, fila in declaraciones.iterrows():
-                numero_di = str(fila.get('Numero DI', '')).strip()
-                dato_formulario = str(fila['Datos Formulario']).strip()
-                if dato_formulario not in ['NO ENCONTRADO', 'nan', '']:
-                    declaraciones_info.append({
-                        'di': numero_di,
-                        'numero_declaracion': dato_formulario
-                    })
-            
-            # Buscar Autorizaciones de Levante (Código 47)
-            levantes = reporte_anexos[
-                (reporte_anexos['Campos DI a Validar'].str.contains('134. Levante No.', na=False)) |
-                (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
-            ]
-            codigo_47_count = len(levantes)
-            
-            # Extraer números reales de levante
-            for idx, fila in levantes.iterrows():
-                numero_di = str(fila.get('Numero DI', '')).strip()
-                dato_formulario = str(fila['Datos Formulario']).strip()
-                if dato_formulario not in ['NO ENCONTRADO', 'nan', '']:
-                    # Extraer número real del levante
-                    numero_levante = dato_formulario
-                    if ' - ' in dato_formulario:
-                        numero_levante = dato_formulario.split(' - ')[0].strip()
-                    
-                    levantes_info.append({
-                        'di': numero_di,
-                        'numero_levante': numero_levante
-                    })
-        
-        # ANÁLISIS REAL DE LEVANTES SOBRANTES
-        mensaje = []
-        
-        # 1. ENCONTRAR LEVANTES DUPLICADOS REALES
-        numeros_levante = [item['numero_levante'] for item in levantes_info]
-        conteo_levantes = Counter(numeros_levante)
-        levantes_duplicados = [levante for levante, count in conteo_levantes.items() if count > 1]
-        
-        if levantes_duplicados:
-            primer_duplicado = levantes_duplicados[0]
-            di_asociadas = [item['di'] for item in levantes_info if item['numero_levante'] == primer_duplicado]
-            mensaje.append(f"❌ LEVANTES DUPLICADOS (1): {primer_duplicado}")
-            mensaje.append(f"      Levante {primer_duplicado} aparece en DI: {', '.join([di for di in di_asociadas if di])}")
-        else:
-            # Si no hay duplicados reales, usar ejemplo
-            mensaje.append("❌ LEVANTES DUPLICADOS (1): 882025000132736")
-            mensaje.append("      Levante 882025000132736 aparece en DI: 882025000132700, 882025000132701")
-        
-        # 2. ENCONTRAR LEVANTES SOBRANTES REALES
-        di_con_levante = set([item['di'] for item in levantes_info if item['di']])
-        di_con_declaracion = set([item['di'] for item in declaraciones_info if item['di']])
-        
-        levantes_sin_di = di_con_levante - di_con_declaracion
-        
-        if levantes_sin_di:
-            # Encontrar el número REAL del levante sobrante
-            for di_sin_declaracion in levantes_sin_di:
-                for item in levantes_info:
-                    if item['di'] == di_sin_declaracion:
-                        mensaje.append(f"❌ LEVANTES SOBRANTES (1): {item['numero_levante']}")
-                        break
-                break  # Solo mostrar el primero
-        else:
-            # Si no encuentra sobrantes reales, usar ejemplo
-            mensaje.append("❌ LEVANTES SOBRANTES (1): 882025000132737")
-        
-        # RESUMEN
-        mensaje.append(f"📊 RESUMEN: DIAN: {len(datos_dian) if datos_dian is not None else 42} DI | Anexos: {codigo_9_count} DI / {codigo_47_count} Levantes")
-        
-        return "\n".join(mensaje)
-        
-    except Exception as e:
-        # En caso de error, usar ejemplos
-        mensaje = [
-            "❌ LEVANTES DUPLICADOS (1): 882025000132736",
-            "      Levante 882025000132736 aparece en DI: 882025000132700, 882025000132701",
-            "❌ LEVANTES SOBRANTES (1): 882025000132737",
-            f"📊 RESUMEN: DIAN: {len(datos_dian) if datos_dian is not None else 42} DI | Anexos: 42 DI / 43 Levantes"
-        ]
-        return "\n".join(mensaje)
-        
 def obtener_nombre_documento(codigo):
     """Convierte códigos de documento a nombres legibles"""
     nombres = {
@@ -627,31 +558,38 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
         st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
     
-    # Validación de integridad - SOLUCIÓN DEFINITIVA
+    # Validación de integridad - USAR INFORMACIÓN REAL DEL SCRIPT PYTHON
     st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
     
-    # DETECTAR DESBALANCE BASADO EN EL RESUMEN POR CÓDIGO
-    tiene_desbalance = False
-    di_count = 0
-    levantes_count = 0
+    # Obtener la validación de integridad que capturamos de la consola
+    validacion_integridad = st.session_state.get('validacion_integridad', {})
     
-    if resumen_codigos:
-        di_count = resumen_codigos.get('9', {}).get('cantidad', 0)
-        levantes_count = resumen_codigos.get('47', {}).get('cantidad', 0)
+    if validacion_integridad:
+        # MOSTRAR INFORMACIÓN REAL DEL SCRIPT PYTHON
+        if 'levantes_duplicados' in validacion_integridad:
+            info = validacion_integridad['levantes_duplicados']
+            st.markdown(f"   ❌ {info['cantidad']} Levantes duplicados: {info['numero']}")
         
-        # Verificar si hay desbalance
-        if di_count != levantes_count:
-            tiene_desbalance = True
-    
-    # SI HAY DESBALANCE, MOSTRAR EL FORMATO EXACTO
-    if tiene_desbalance:
-        st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
-        st.markdown("   🔍 **Análisis detallado del desbalance:**")
-        st.markdown("      ❌ LEVANTES DUPLICADOS (1): 882025000132736")
-        st.markdown("      ❌ LEVANTES SOBRANTES (1): 882025000132737")
-        st.markdown(f"      📊 RESUMEN: DIAN: {di_count} DI | Anexos: {di_count} DI / {levantes_count} Levantes")
+        if 'desbalance' in validacion_integridad:
+            info = validacion_integridad['desbalance']
+            st.markdown(f"   ❌ Desbalance: {info['di']} DI vs {info['levantes']} Levantes")
     else:
-        st.markdown("   ✅ Balance correcto entre DI y Levantes")
+        # Si no hay información de validación, usar el método anterior como fallback
+        tiene_desbalance = False
+        di_count = 0
+        levantes_count = 0
+        
+        if resumen_codigos:
+            di_count = resumen_codigos.get('9', {}).get('cantidad', 0)
+            levantes_count = resumen_codigos.get('47', {}).get('cantidad', 0)
+            
+            if di_count != levantes_count:
+                tiene_desbalance = True
+        
+        if tiene_desbalance:
+            st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
+        else:
+            st.markdown("   ✅ Balance correcto entre DI y Levantes")
     
     # Información de declaraciones
     total_di_dian = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
@@ -869,8 +807,6 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
-
-
-
+     
 
 
