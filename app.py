@@ -76,10 +76,11 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     """Muestra los resultados de validación en el formato específico solicitado"""
     
 # Información del Proveedor
+    
     st.markdown("### 👤 Información del Proveedor")
     nit = datos_proveedor.get('nit', 'No disponible')
     nombre = datos_proveedor.get('nombre', 'No disponible')
-    st.markdown(f" **NIT:** {nit}   **Nombre:** {nombre}")
+    st.markdown(f"**📇 NIT:** {nit}  \n**🏢 Nombre:** {nombre}")
     
     # Resumen por código
     st.markdown("### 🗒️ Resumen por código:")
@@ -698,6 +699,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
