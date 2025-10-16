@@ -498,6 +498,16 @@ def mostrar_resultados_en_pantalla():
             
             # Mostrar la tabla con estilos
             st.dataframe(styled_reporte, use_container_width=True)
+            
+            # MOSTRAR TOTALES ACUMULADOS (como estaba antes)
+            fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
+            if not fila_totales.empty:
+                st.markdown("**Totales Acumulados:**")
+                st.dataframe(fila_totales, use_container_width=True)
+                
+                # Resaltar también los totales si hay diferencias
+                if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
+                    st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
 
 def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
@@ -687,3 +697,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
