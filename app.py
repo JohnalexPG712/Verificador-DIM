@@ -68,6 +68,590 @@ def inicializar_estados():
     if 'validacion_integridad' not in st.session_state:
         st.session_state.validacion_integridad = None
 
+# =============================================================================
+# NUEVAS FUNCIONES PARA MOSTRAR RESULTADOS EN EL FORMATO ESPECÍFICO
+# =============================================================================
+
+def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, estadisticas_validacion, validacion_integridad):
+    """Muestra los resultados de validación en el formato específico solicitado"""
+    
+    # Información del Proveedor
+    st.markdown("### 👤 Información del Proveedor")
+    nit = datos_proveedor.get('nit', 'No disponible')
+    nombre = datos_proveedor.get('nombre', 'No disponible')
+    st.markdown(f"[**NIT:** {nit}] [**Nombre:** {nombre}]")
+    
+    # Resumen por código
+    st.markdown("### 📊 Resumen por código:")
+    if resumen_codigos:
+        for codigo, info in resumen_codigos.items():
+            cantidad = info.get('cantidad', 0)
+            nombre_doc = info.get('nombre', 'DOCUMENTO')
+            st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
+    
+    # Validación de Integridad (si hay problemas críticos)
+    tiene_problemas_criticos = False
+    if validacion_integridad:
+        st.markdown("### 🔍 VALIDACIÓN DE INTEGRIDAD:")
+        
+        if 'levantes_duplicados' in validacion_integridad:
+            info = validacion_integridad['levantes_duplicados']
+            st.markdown(f"❌ {info['cantidad']} Levantes duplicados: {info['numero']}")
+            tiene_problemas_criticos = True
+        
+        if 'desbalance' in validacion_integridad:
+            info = validacion_integridad['desbalance']
+            st.markdown(f"❌ Desbalance: {info['di']} DI vs {info['levantes']} Levantes")
+            tiene_problemas_criticos = True
+    
+    # Análisis de Integridad
+    st.markdown("### 🔍 Análisis de Integridad")
+    
+    total_di_anexos = estadisticas_validacion.get('total_di', 0)
+    total_di_procesadas = estadisticas_validacion.get('total_di_dian', 0)
+    di_faltantes = total_di_anexos - total_di_procesadas
+    
+    st.markdown(f"[**DI en Anexos:** {total_di_anexos} -{di_faltantes} faltantes] [**DI Procesadas:** {total_di_procesadas} de {total_di_anexos} totales]")
+    
+    # Estado de la Validación
+    st.markdown("### 📈 Estado de la Validación")
+    
+    if tiene_problemas_criticos:
+        if 'desbalance' in validacion_integridad:
+            info = validacion_integridad['desbalance']
+            st.markdown(f"❌ Desbalance detectado: {info['di']} DI vs {info['levantes']} Levantes")
+    else:
+        # Calcular balance DI vs Levantes
+        di_count = resumen_codigos.get('9', {}).get('cantidad', 0) if resumen_codigos else 0
+        levantes_count = resumen_codigos.get('47', {}).get('cantidad', 0) if resumen_codigos else 0
+        
+        if di_count == levantes_count:
+            st.markdown(f"✅ Balance correcto en anexos: {di_count} DI = {levantes_count} Levantes")
+        else:
+            st.markdown(f"❌ Desbalance detectado: {di_count} DI vs {levantes_count} Levantes")
+            tiene_problemas_criticos = True
+    
+    if di_faltantes > 0:
+        st.markdown(f"⚠️ Diferencia encontrada: {total_di_procesadas} DI procesadas vs {total_di_anexos} DI en anexos")
+        st.markdown(f"   📝 Faltan por procesar: {di_faltantes} declaraciones de DI")
+    
+    # RESUMEN EJECUTIVO
+    st.markdown("### 🎯 RESUMEN EJECUTIVO")
+    
+    declaraciones_correctas = estadisticas_validacion.get('declaraciones_correctas', 0)
+    eficiencia = (total_di_procesadas / total_di_anexos * 100) if total_di_anexos > 0 else 0
+    
+    st.markdown(f"[**DI Procesadas:** {total_di_procesadas}/{total_di_anexos} -{di_faltantes}] [**Validación:** {declaraciones_correctas}✅ Perfecto] [**Eficiencia:** {eficiencia:.1f}%]")
+    
+    # Estado Final del Proceso
+    st.markdown("### 📋 Estado Final del Proceso")
+    
+    if tiene_problemas_criticos:
+        st.markdown("🚨 **PROCESO COMPLETADO CON PROBLEMAS CRÍTICOS**")
+        st.markdown("Se detectaron inconsistencias en la validación de integridad")
+    else:
+        if di_faltantes > 0:
+            st.markdown("🔍 **PROCESO COMPLETADO CON INCOMPLETITUD**")
+        else:
+            st.markdown("✅ **PROCESO COMPLETADO EXITOSAMENTE**")
+    
+    st.markdown(f"📊 {total_di_procesadas} de {total_di_anexos} DI procesadas | ✅ {declaraciones_correctas} correctas | ❌ {estadisticas_validacion.get('declaraciones_con_errores', 0)} con diferencias")
+
+def extraer_datos_de_consola_mejorado(consola_output):
+    """Extrae datos del proveedor de la salida de consola - MEJORADO"""
+    datos = {'nit': 'No disponible', 'nombre': 'No disponible'}
+    
+    lineas = consola_output.split('\n')
+    for i, linea in enumerate(lineas):
+        if 'NIT:' in linea:
+            # Buscar NIT en la línea actual o siguiente
+            nit_match = re.search(r'NIT:\s*([0-9]+)', linea)
+            if nit_match:
+                datos['nit'] = nit_match.group(1)
+            elif i + 1 < len(lineas):
+                nit_match = re.search(r'([0-9]{6,12})', lineas[i + 1])
+                if nit_match:
+                    datos['nit'] = nit_match.group(1)
+        
+        if 'Nombre:' in linea or 'Razón Social:' in linea:
+            # Buscar nombre en la línea actual o siguiente
+            nombre_match = re.search(r'(?:Nombre|Razón Social):\s*(.+)', linea)
+            if nombre_match:
+                datos['nombre'] = nombre_match.group(1).strip()
+            elif i + 1 < len(lineas):
+                nombre_texto = lineas[i + 1].strip()
+                if nombre_texto and not nombre_texto.isdigit():
+                    datos['nombre'] = nombre_texto
+    
+    return datos
+
+def extraer_resumen_de_consola_mejorado(consola_output):
+    """Extrae resumen de códigos Y validación de integridad de la salida de consola - MEJORADO"""
+    resumen = {}
+    validacion_integridad = {}
+    
+    lineas = consola_output.split('\n')
+    en_resumen = False
+    en_validacion = False
+    
+    for linea in lineas:
+        # Capturar VALIDACIÓN DE INTEGRIDAD
+        if 'VALIDACIÓN DE INTEGRIDAD:' in linea or 'VALIDACION DE INTEGRIDAD:' in linea:
+            en_validacion = True
+            continue
+        
+        if en_validacion:
+            if '❌' in linea:
+                if 'Levantes duplicados:' in linea or 'DI duplicadas:' in linea:
+                    match = re.search(r'❌\s*(\d+)\s*(?:Levantes|DI)\s*duplicados?:\s*([0-9, ]+)', linea)
+                    if match:
+                        validacion_integridad['levantes_duplicados'] = {
+                            'cantidad': match.group(1),
+                            'numero': match.group(2).strip()
+                        }
+                elif 'Desbalance:' in linea:
+                    match = re.search(r'❌\s*Desbalance:\s*(\d+)\s*DI\s*vs\s*(\d+)\s*Levantes', linea)
+                    if match:
+                        validacion_integridad['desbalance'] = {
+                            'di': match.group(1),
+                            'levantes': match.group(2)
+                        }
+            elif not linea.strip() or '📋 Declaraciones encontradas:' in linea:
+                en_validacion = False
+        
+        # Capturar RESUMEN POR CÓDIGO
+        if 'Resumen por código:' in linea or '📊 Resumen por código:' in linea:
+            en_resumen = True
+            continue
+        
+        if en_resumen and linea.strip().startswith('•'):
+            match = re.search(r'•\s*Código\s+(\d+):\s*(\d+)\s*-\s*(.+)', linea)
+            if match:
+                codigo = match.group(1)
+                cantidad = int(match.group(2))
+                nombre = match.group(3).strip()
+                resumen[codigo] = {'cantidad': cantidad, 'nombre': nombre}
+        
+        if en_resumen and not linea.strip().startswith('•') and linea.strip():
+            en_resumen = False
+    
+    return resumen, validacion_integridad
+
+def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
+    """Extrae estadísticas REALES de la salida de consola - MEJORADO"""
+    estadisticas = {
+        'total_anexos': 0,
+        'total_di': 0,
+        'total_di_dian': len(datos_dian) if datos_dian is not None else 0,
+        'declaraciones_con_errores': 0,
+        'declaraciones_correctas': 0,
+        'datos_dian': datos_dian
+    }
+    
+    lineas = consola_output.split('\n')
+    
+    for linea in lineas:
+        # Buscar total de anexos
+        if 'anexos encontrados' in linea:
+            match = re.search(r'✅\s*(\d+)\s*anexos', linea)
+            if match:
+                estadisticas['total_anexos'] = int(match.group(1))
+        
+        # Buscar total DI en anexos
+        if 'Código 9:' in linea:
+            match = re.search(r'Código\s*9:\s*(\d+)', linea)
+            if match:
+                estadisticas['total_di'] = int(match.group(1))
+        
+        # Buscar declaraciones con errores
+        if 'Declaraciones con errores:' in linea:
+            match = re.search(r'Declaraciones con errores:\s*(\d+)', linea)
+            if match:
+                estadisticas['declaraciones_con_errores'] = int(match.group(1))
+        elif 'declaraciones con errores' in linea.lower():
+            match = re.search(r'(\d+)\s*declaraciones con errores', linea.lower())
+            if match:
+                estadisticas['declaraciones_con_errores'] = int(match.group(1))
+    
+    # Calcular declaraciones correctas
+    estadisticas['declaraciones_correctas'] = estadisticas['total_di_dian'] - estadisticas['declaraciones_con_errores']
+    
+    return estadisticas
+
+# =============================================================================
+# FUNCIONES AUXILIARES EXISTENTES (MANTENIDAS)
+# =============================================================================
+
+def obtener_nombre_documento(codigo):
+    """Convierte códigos de documento a nombres legibles"""
+    nombres = {
+        '6': 'FACTURA COMERCIAL',
+        '9': 'DECLARACION DE IMPORTACION', 
+        '17': 'DOCUMENTO DE TRANSPORTE',
+        '47': 'AUTORIZACION DE LEVANTE',
+        '93': 'FORMULARIO DE SALIDA ZONA FRANCA',
+        'coincidentes': 'CAMPOS COINCIDENTES',
+        'no_coincidentes': 'CAMPOS NO COINCIDENTES'
+    }
+    return nombres.get(str(codigo), f'DOCUMENTO {codigo}')
+
+def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
+    """Muestra resultados simplificados de la comparación sin detalle por declaración"""
+    
+    if reporte_comparacion is None or reporte_comparacion.empty:
+        st.error("No hay datos de comparación para mostrar")
+        return
+    
+    # Mostrar información de extracción
+    st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIM)...**")
+    st.markdown("📄 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
+    st.write(f"✅ Datos DIM extraídos: {len(datos_dian)} registros")
+    st.write(f"✅ Datos Subpartidas extraídos: {len(datos_subpartidas)} registros")
+    
+    # Resumen estadístico
+    st.markdown("📈 **RESUMEN ESTADÍSTICO:**")
+    
+    di_individuales = reporte_comparacion[reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS']
+    conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
+    con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
+    
+    st.write(f"   • Total DI procesadas: {len(di_individuales)}")
+    st.write(f"   • DI conformes: {conformes}")
+    st.write(f"   • DI con diferencias: {con_diferencias}")
+    
+    # Totales acumulados
+    fila_totales = reporte_comparacion[reporte_comparacion['4. Número DI'] == 'VALORES ACUMULADOS']
+    if not fila_totales.empty:
+        total_di = fila_totales.iloc[0]
+        st.write(f"   • Totales: {total_di['Resultado verificación']}")
+    
+    st.markdown("============================================================")
+
+# =============================================================================
+# FUNCIONES PRINCIPALES ACTUALIZADAS
+# =============================================================================
+
+def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
+    """Procesa la conciliación con los archivos cargados - ACTUALIZADA"""
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Guardar archivos en temporal
+            for pdf in dian_pdfs:
+                with open(os.path.join(temp_dir, pdf.name), "wb") as f:
+                    f.write(pdf.getbuffer())
+            
+            excel_sub_path = os.path.join(temp_dir, excel_subpartidas.name)
+            with open(excel_sub_path, "wb") as f:
+                f.write(excel_subpartidas.getbuffer())
+            
+            excel_anexos_path = os.path.join(temp_dir, excel_anexos.name)  
+            with open(excel_anexos_path, "wb") as f:
+                f.write(excel_anexos.getbuffer())
+
+            # Procesar comparación DIM vs Subpartidas
+            st.info("🔍 Comparando DIM vs Subpartidas...")
+            
+            extractor_dian = ExtractorDIANSimplificado()
+            datos_dian = extractor_dian.procesar_multiples_dis(temp_dir)
+            
+            if datos_dian is None or datos_dian.empty:
+                st.error("❌ No se pudieron extraer datos de las DIM")
+                return None
+            
+            st.success(f"✅ {len(datos_dian)} declaraciones DIAN extraídas")
+            
+            extractor_subpartidas = ExtractorSubpartidas()
+            datos_subpartidas = extractor_subpartidas.extraer_y_estandarizar(temp_dir)
+            
+            if datos_subpartidas.empty:
+                st.error("❌ No se pudieron extraer datos del archivo de subpartidas")
+                return None
+            
+            st.success(f"✅ Datos de subpartidas extraídos: {len(datos_subpartidas)} registros")
+            
+            comparador = ComparadorDatos()
+            output_comparacion = os.path.join(temp_dir, "comparacion_dim_subpartidas.xlsx")
+            reporte_comparacion = comparador.generar_reporte_comparacion(
+                datos_dian, datos_subpartidas, output_comparacion
+            )
+
+            # MOSTRAR RESULTADOS EN CONSOLA - Comparación DIM vs Subpartidas
+            st.markdown("---")
+            st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
+            st.markdown("============================================================")
+            mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas)
+
+            # Procesar validación de anexos
+            st.info("📋 Validando anexos FMM...")
+            
+            validador = ValidadorDeclaracionImportacionCompleto()
+            output_anexos = os.path.join(temp_dir, "validacion_anexos.xlsx")
+            
+            # CAPTURAR LA SALIDA DE CONSOLA DEL VALIDADOR
+            import io
+            import sys
+            from contextlib import redirect_stdout
+            
+            # Crear un buffer para capturar la salida
+            output_buffer = io.StringIO()
+            
+            with redirect_stdout(output_buffer):
+                resultado_validacion = validador.procesar_validacion_completa(temp_dir, output_anexos)
+            
+            # Obtener la salida de consola
+            consola_output = output_buffer.getvalue()
+            
+            # EXTRAER DATOS REALES DEL PROCESAMIENTO CON LAS NUEVAS FUNCIONES
+            datos_proveedor = extraer_datos_de_consola_mejorado(consola_output)
+            resumen_codigos, validacion_integridad = extraer_resumen_de_consola_mejorado(consola_output)
+            estadisticas_validacion = extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian)
+            
+            # Si el validador retorna un diccionario, usarlo, sino usar los datos extraídos
+            if isinstance(resultado_validacion, dict):
+                reporte_anexos = resultado_validacion.get('reporte_anexos')
+                # Combinar con datos extraídos de consola
+                datos_proveedor = resultado_validacion.get('datos_proveedor', datos_proveedor)
+                resumen_codigos = resultado_validacion.get('resumen_codigos', resumen_codigos)
+                estadisticas_validacion = resultado_validacion.get('estadisticas_validacion', estadisticas_validacion)
+            else:
+                reporte_anexos = resultado_validacion
+
+            # MOSTRAR RESULTADOS EN EL NUEVO FORMATO
+            st.subheader("📋 RESULTADOS DE VALIDACIÓN - FORMATO ESPECÍFICO")
+            st.markdown("============================================================")
+            
+            mostrar_resultados_validacion_formateados(
+                datos_proveedor, 
+                resumen_codigos, 
+                estadisticas_validacion, 
+                validacion_integridad
+            )
+
+            # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
+            with open(output_comparacion, "rb") as f:
+                st.session_state.comparacion_data = f.read()
+            
+            with open(output_anexos, "rb") as f:
+                st.session_state.anexos_data = f.read()
+            
+            # Guardar también los DataFrames completos para mostrar resultados
+            st.session_state.reporte_comparacion = reporte_comparacion
+            st.session_state.reporte_anexos = reporte_anexos
+            st.session_state.datos_dian = datos_dian
+            st.session_state.datos_subpartidas = datos_subpartidas
+            # Guardar las variables de resumen
+            st.session_state.datos_proveedor = datos_proveedor
+            st.session_state.resumen_codigos = resumen_codigos
+            st.session_state.estadisticas_validacion = estadisticas_validacion
+            st.session_state.validacion_integridad = validacion_integridad
+
+            return {
+                'comparacion': reporte_comparacion is not None,
+                'anexos': reporte_anexos is not None,
+                'datos_dian': datos_dian,
+                'datos_subpartidas': datos_subpartidas,
+                'reporte_comparacion': reporte_comparacion,
+                'reporte_anexos': reporte_anexos,
+                'datos_proveedor': datos_proveedor,
+                'resumen_codigos': resumen_codigos,
+                'estadisticas_validacion': estadisticas_validacion,
+                'validacion_integridad': validacion_integridad
+            }
+
+        except Exception as e:
+            st.error(f"❌ Error en el procesamiento: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+            return None
+
+def mostrar_resultados_en_pantalla():
+    """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA"""
+    
+    st.markdown("---")
+    st.header("📊 Resultados de la Conciliación")
+    
+    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
+    if st.session_state.reporte_comparacion is not None:
+        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
+        st.markdown("============================================================")
+        mostrar_resultados_consola_comparacion_simplificado(
+            st.session_state.reporte_comparacion, 
+            st.session_state.datos_dian, 
+            st.session_state.datos_subpartidas
+        )
+    
+    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA
+    st.subheader("🔍 Comparación DIM vs Subpartidas")
+    
+    if st.session_state.reporte_comparacion is not None:
+        reporte = st.session_state.reporte_comparacion
+        
+        # Mostrar resumen estadístico
+        st.markdown("**Resumen Estadístico:**")
+        
+        di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
+        conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
+        con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total DI procesadas", len(di_individuales))
+        with col2:
+            st.metric("DI conformes", conformes)
+        with col3:
+            st.metric("DI con diferencias", con_diferencias)
+        
+        # Mostrar tabla de resultados con resaltado SOLO para diferencias
+        st.markdown("**Detalle por Declaración:**")
+        
+        # Aplicar estilos para resaltar SOLO filas con diferencias
+        def resaltar_solo_diferencias(row):
+            """Resalta SOLO filas que tienen diferencias (❌)"""
+            if '❌' in str(row['Resultado verificación']):
+                return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
+            else:
+                return [''] * len(row)  # Sin resaltado para conformes
+        
+        # Aplicar el estilo
+        styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
+        
+        # Mostrar la tabla con estilos
+        st.dataframe(styled_reporte, use_container_width=True)
+        
+        # Mostrar totales acumulados
+        fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
+        if not fila_totales.empty:
+            st.markdown("**Totales Acumulados:**")
+            st.dataframe(fila_totales, use_container_width=True)
+            
+            # Resaltar también los totales si hay diferencias
+            if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
+                st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
+    else:
+        st.error("No se pudo generar el reporte de comparación")
+
+    # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO
+    st.subheader("📋 RESULTADOS DE VALIDACIÓN - FORMATO ESPECÍFICO")
+    st.markdown("============================================================")
+    
+    if (st.session_state.datos_proveedor is not None and 
+        st.session_state.resumen_codigos is not None and 
+        st.session_state.estadisticas_validacion is not None):
+        
+        mostrar_resultados_validacion_formateados(
+            st.session_state.datos_proveedor,
+            st.session_state.resumen_codigos,
+            st.session_state.estadisticas_validacion,
+            st.session_state.validacion_integridad
+        )
+    else:
+        st.error("No se pudieron cargar los datos de validación")
+
+    # Resultados de Validación de Anexos - TABLA DETALLADA
+    st.subheader("📋 Validación de Anexos y Proveedores - Detalle")
+    
+    if st.session_state.reporte_anexos is not None:
+        reporte_anexos = st.session_state.reporte_anexos
+        
+        if reporte_anexos is not None and not reporte_anexos.empty:
+            # Mostrar resumen de validación
+            st.markdown("**Resumen de Validación:**")
+            
+            total_campos = len(reporte_anexos)
+            coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
+            no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total campos validados", total_campos)
+            with col2:
+                st.metric("Campos correctos", coincidencias)
+            with col3:
+                st.metric("Campos con diferencias", no_coincidencias)
+            
+            # Mostrar tabla de validación con resaltado SOLO para diferencias
+            st.markdown("**Detalle de Validación:**")
+            
+            def resaltar_solo_validacion_anexos(row):
+                """Resalta SOLO filas que no coinciden en la validación de anexos"""
+                if row['Coincidencias'] == '❌ NO COINCIDE':
+                    return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
+                else:
+                    return [''] * len(row)  # Sin resaltado para coincidencias
+            
+            # Aplicar el estilo
+            styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
+            
+            st.dataframe(styled_anexos, use_container_width=True)
+            
+            # Mostrar resumen por DI para anexos - SOLO mostrar las que requieren atención
+            st.markdown("**Declaraciones que Requieren Atención:**")
+            di_unicos = reporte_anexos['Numero DI'].unique()
+            di_con_problemas = []
+            
+            for di in di_unicos:
+                datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
+                incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
+                
+                if incorrectos > 0:
+                    di_con_problemas.append(di)
+                    st.error(f"DI {di}: {incorrectos} campo(s) con diferencias - **REQUIERE ATENCIÓN**")
+            
+            if not di_con_problemas:
+                st.success("✅ Todas las declaraciones están conformes")
+                    
+        else:
+            st.info("No hay datos de validación de anexos para mostrar")
+    else:
+        st.error("No se pudo generar el reporte de validación de anexos")
+
+def mostrar_botones_descarga():
+    """Muestra los botones para descargar los Excel"""
+    
+    st.markdown("---")
+    st.header("📥 Descargar Resultados Completos")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.session_state.comparacion_data is not None:
+            # Usar una key única dinámica basada en el contador
+            download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
+            st.download_button(
+                label="📥 Descargar Validación DIM vs Subpartidas (Excel)",
+                data=st.session_state.comparacion_data,
+                file_name="Comparacion_DIM_Subpartidas.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True,
+                key=download_key_comp
+            )
+        else:
+            st.button(
+                "📊 Comparación No Disponible",
+                disabled=True,
+                use_container_width=True
+            )
+    
+    with col2:
+        if st.session_state.anexos_data is not None:
+            # Usar una key única dinámica basada en el contador
+            download_key_anex = f"download_anexos_{st.session_state.download_counter}"
+            st.download_button(
+                label="📥 Descargar Comparación Anexos FMM (Excel)",
+                data=st.session_state.anexos_data,
+                file_name="Validacion_Anexos_FMM.xlsx", 
+                mime="application/vnd.ms-excel",
+                use_container_width=True,
+                key=download_key_anex
+            )
+        else:
+            st.button(
+                "📋 Validación No Disponible",
+                disabled=True,
+                use_container_width=True
+            )
+
 def main():
     inicializar_estados()
     
@@ -208,615 +792,6 @@ def main():
                 st.success("✅ Verificación completada exitosamente")
                 st.rerun()
 
-def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
-    """Procesa la conciliación con los archivos cargados"""
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            # Guardar archivos en temporal
-            for pdf in dian_pdfs:
-                with open(os.path.join(temp_dir, pdf.name), "wb") as f:
-                    f.write(pdf.getbuffer())
-            
-            excel_sub_path = os.path.join(temp_dir, excel_subpartidas.name)
-            with open(excel_sub_path, "wb") as f:
-                f.write(excel_subpartidas.getbuffer())
-            
-            excel_anexos_path = os.path.join(temp_dir, excel_anexos.name)  
-            with open(excel_anexos_path, "wb") as f:
-                f.write(excel_anexos.getbuffer())
-
-            # Procesar comparación DIM vs Subpartidas
-            st.info("🔍 Comparando DIM vs Subpartidas...")
-            
-            extractor_dian = ExtractorDIANSimplificado()
-            datos_dian = extractor_dian.procesar_multiples_dis(temp_dir)
-            
-            if datos_dian is None or datos_dian.empty:
-                st.error("❌ No se pudieron extraer datos de las DIM")
-                return None
-            
-            st.success(f"✅ {len(datos_dian)} declaraciones DIAN extraídas")
-            
-            extractor_subpartidas = ExtractorSubpartidas()
-            datos_subpartidas = extractor_subpartidas.extraer_y_estandarizar(temp_dir)
-            
-            if datos_subpartidas.empty:
-                st.error("❌ No se pudieron extraer datos del archivo de subpartidas")
-                return None
-            
-            st.success(f"✅ Datos de subpartidas extraídos: {len(datos_subpartidas)} registros")
-            
-            comparador = ComparadorDatos()
-            output_comparacion = os.path.join(temp_dir, "comparacion_dim_subpartidas.xlsx")
-            reporte_comparacion = comparador.generar_reporte_comparacion(
-                datos_dian, datos_subpartidas, output_comparacion
-            )
-
-            # MOSTRAR RESULTADOS EN CONSOLA - Comparación DIM vs Subpartidas (VERSIÓN SIMPLIFICADA)
-            st.markdown("---")
-            st.subheader("📈 EJECUTANDO: Comparación DIM vs Subpartida")
-            st.markdown("============================================================")
-            mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas)
-
-            # Procesar validación de anexos
-            st.info("📋 Validando anexos FMM...")
-            
-            validador = ValidadorDeclaracionImportacionCompleto()
-            output_anexos = os.path.join(temp_dir, "validacion_anexos.xlsx")
-            
-            # CAPTURAR LA SALIDA DE CONSOLA DEL VALIDADOR
-            import io
-            import sys
-            from contextlib import redirect_stdout
-            
-            # Crear un buffer para capturar la salida
-            output_buffer = io.StringIO()
-            
-            with redirect_stdout(output_buffer):
-                resultado_validacion = validador.procesar_validacion_completa(temp_dir, output_anexos)
-            
-            # Obtener la salida de consola
-            consola_output = output_buffer.getvalue()
-            
-            # EXTRAER DATOS REALES DEL PROCESAMIENTO
-            datos_proveedor = extraer_datos_de_consola(consola_output)
-            resumen_codigos = extraer_resumen_de_consola(consola_output)
-            estadisticas_validacion = extraer_estadisticas_de_consola(consola_output, datos_dian)
-            
-            # Si el validador retorna un diccionario, usarlo, sino usar los datos extraídos
-            if isinstance(resultado_validacion, dict):
-                reporte_anexos = resultado_validacion.get('reporte_anexos')
-                # Combinar con datos extraídos de consola
-                datos_proveedor = resultado_validacion.get('datos_proveedor', datos_proveedor)
-                resumen_codigos = resultado_validacion.get('resumen_codigos', resumen_codigos)
-                estadisticas_validacion = resultado_validacion.get('estadisticas_validacion', estadisticas_validacion)
-            else:
-                reporte_anexos = resultado_validacion
-
-            # MOSTRAR RESULTADOS EN CONSOLA - Validación Anexos (VERSIÓN SIMPLIFICADA)
-            st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
-            st.markdown("============================================================")
-            mostrar_resultados_consola_anexos_simplificado(
-                reporte_anexos, 
-                datos_proveedor, 
-                resumen_codigos, 
-                estadisticas_validacion
-            )
-
-            # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
-            with open(output_comparacion, "rb") as f:
-                st.session_state.comparacion_data = f.read()
-            
-            with open(output_anexos, "rb") as f:
-                st.session_state.anexos_data = f.read()
-            
-            # Guardar también los DataFrames completos para mostrar resultados
-            st.session_state.reporte_comparacion = reporte_comparacion
-            st.session_state.reporte_anexos = reporte_anexos
-            st.session_state.datos_dian = datos_dian
-            st.session_state.datos_subpartidas = datos_subpartidas
-            # Guardar las variables de resumen
-            st.session_state.datos_proveedor = datos_proveedor
-            st.session_state.resumen_codigos = resumen_codigos
-            st.session_state.estadisticas_validacion = estadisticas_validacion
-
-            return {
-                'comparacion': reporte_comparacion is not None,
-                'anexos': reporte_anexos is not None,
-                'datos_dian': datos_dian,
-                'datos_subpartidas': datos_subpartidas,
-                'reporte_comparacion': reporte_comparacion,
-                'reporte_anexos': reporte_anexos,
-                'datos_proveedor': datos_proveedor,
-                'resumen_codigos': resumen_codigos,
-                'estadisticas_validacion': estadisticas_validacion
-            }
-
-        except Exception as e:
-            st.error(f"❌ Error en el procesamiento: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
-            return None
-
-# NUEVAS FUNCIONES PARA EXTRAER DATOS REALES DE LA CONSOLA
-def extraer_datos_de_consola(consola_output):
-    """Extrae datos del proveedor de la salida de consola"""
-    datos = {'nit': 'No disponible', 'nombre': 'No disponible'}
-    
-    lineas = consola_output.split('\n')
-    for i, linea in enumerate(lineas):
-        if 'NIT:' in linea:
-            # Buscar NIT en la línea actual o siguiente
-            nit_match = re.search(r'NIT:\s*([0-9]+)', linea)
-            if nit_match:
-                datos['nit'] = nit_match.group(1)
-            elif i + 1 < len(lineas):
-                nit_match = re.search(r'([0-9]{6,12})', lineas[i + 1])
-                if nit_match:
-                    datos['nit'] = nit_match.group(1)
-        
-        if 'Nombre:' in linea:
-            # Buscar nombre en la línea actual o siguiente
-            nombre_match = re.search(r'Nombre:\s*(.+)', linea)
-            if nombre_match:
-                datos['nombre'] = nombre_match.group(1).strip()
-            elif i + 1 < len(lineas):
-                nombre_texto = lineas[i + 1].strip()
-                if nombre_texto and not nombre_texto.isdigit():
-                    datos['nombre'] = nombre_texto
-    
-    return datos
-
-def extraer_resumen_de_consola(consola_output):
-    """Extrae resumen de códigos Y validación de integridad de la salida de consola"""
-    resumen = {}
-    validacion_integridad = {}
-    
-    lineas = consola_output.split('\n')
-    en_resumen = False
-    en_validacion = False
-    
-    for linea in lineas:
-        # Capturar VALIDACIÓN DE INTEGRIDAD
-        if 'VALIDACIÓN DE INTEGRIDAD:' in linea or 'VALIDACION DE INTEGRIDAD:' in linea:
-            en_validacion = True
-            continue
-        
-        if en_validacion:
-            if '❌' in linea or '✅' in linea:
-                if 'Levantes duplicados:' in linea:
-                    match = re.search(r'❌\s*(\d+)\s*Levantes duplicados:\s*([0-9]+)', linea)
-                    if match:
-                        validacion_integridad['levantes_duplicados'] = {
-                            'cantidad': match.group(1),
-                            'numero': match.group(2)
-                        }
-                elif 'Desbalance:' in linea:
-                    match = re.search(r'❌\s*Desbalance:\s*(\d+)\s*DI\s*vs\s*(\d+)\s*Levantes', linea)
-                    if match:
-                        validacion_integridad['desbalance'] = {
-                            'di': match.group(1),
-                            'levantes': match.group(2)
-                        }
-            elif not linea.strip() or '📋 Declaraciones encontradas:' in linea:
-                en_validacion = False
-        
-        # Capturar RESUMEN POR CÓDIGO (existente)
-        if 'Resumen por código:' in linea:
-            en_resumen = True
-            continue
-        
-        if en_resumen and linea.strip().startswith('• Código'):
-            match = re.search(r'Código\s+(\d+):\s*(\d+)\s*-\s*(.+)', linea)
-            if match:
-                codigo = match.group(1)
-                cantidad = int(match.group(2))
-                nombre = match.group(3).strip()
-                resumen[codigo] = {'cantidad': cantidad, 'nombre': nombre}
-        
-        if en_resumen and not linea.strip().startswith('•'):
-            en_resumen = False
-    
-    # Guardar validación de integridad en session_state para usarla después
-    if validacion_integridad:
-        st.session_state.validacion_integridad = validacion_integridad
-    
-    return resumen
-
-def extraer_estadisticas_de_consola(consola_output, datos_dian):
-    """Extrae estadísticas REALES de la salida de consola"""
-    estadisticas = {
-        'total_anexos': 0,
-        'total_di': len(datos_dian) if datos_dian is not None else 0,
-        'levantes_duplicados': [],
-        'desbalance_di_levantes': False,
-        'total_levantes': 0,
-        'declaraciones_con_errores': 0,
-        'declaraciones_correctas': 0,
-        'datos_dian': datos_dian
-    }
-    
-    lineas = consola_output.split('\n')
-    
-    for linea in lineas:
-        # Buscar total de anexos
-        if 'anexos encontrados' in linea:
-            match = re.search(r'✅\s*(\d+)\s*anexos', linea)
-            if match:
-                estadisticas['total_anexos'] = int(match.group(1))
-        
-        # Buscar declaraciones con errores - CORREGIDO
-        if 'Declaraciones con errores:' in linea:
-            match = re.search(r'Declaraciones con errores:\s*(\d+)', linea)
-            if match:
-                estadisticas['declaraciones_con_errores'] = int(match.group(1))
-        elif 'declaraciones con errores' in linea.lower():
-            match = re.search(r'(\d+)\s*declaraciones con errores', linea.lower())
-            if match:
-                estadisticas['declaraciones_con_errores'] = int(match.group(1))
-        
-        # Buscar balance DI vs Levantes
-        if 'Balance correcto:' in linea:
-            match = re.search(r'(\d+)\s*DI\s*=\s*(\d+)\s*Levantes', linea)
-            if match:
-                estadisticas['total_levantes'] = int(match.group(2))
-                estadisticas['desbalance_di_levantes'] = False
-        elif 'Desbalance:' in linea:
-            match = re.search(r'(\d+)\s*DI\s*vs\s*(\d+)\s*Levantes', linea)
-            if match:
-                estadisticas['total_levantes'] = int(match.group(2))
-                estadisticas['desbalance_di_levantes'] = True
-    
-    # Calcular declaraciones correctas
-    estadisticas['declaraciones_correctas'] = estadisticas['total_di'] - estadisticas['declaraciones_con_errores']
-    
-    return estadisticas
-
-# FUNCIONES AUXILIARES MEJORADAS
-def obtener_nombre_documento(codigo):
-    """Convierte códigos de documento a nombres legibles"""
-    nombres = {
-        '6': 'FACTURA COMERCIAL',
-        '9': 'DECLARACION DE IMPORTACION', 
-        '17': 'DOCUMENTO DE TRANSPORTE',
-        '47': 'AUTORIZACION DE LEVANTE',
-        '93': 'FORMULARIO DE SALIDA ZONA FRANCA',
-        'coincidentes': 'CAMPOS COINCIDENTES',
-        'no_coincidentes': 'CAMPOS NO COINCIDENTES'
-    }
-    return nombres.get(str(codigo), f'DOCUMENTO {codigo}')
-
-def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
-    """Muestra resultados simplificados de la comparación sin detalle por declaración"""
-    
-    if reporte_comparacion is None or reporte_comparacion.empty:
-        st.error("No hay datos de comparación para mostrar")
-        return
-    
-    # Mostrar información de extracción
-    st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIM)...**")
-    st.markdown("📄 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
-    st.write(f"✅ Datos DIM extraídos: {len(datos_dian)} registros")
-    st.write(f"✅ Datos Subpartidas extraídos: {len(datos_subpartidas)} registros")
-    
-    # Resumen estadístico
-    st.markdown("📈 **RESUMEN ESTADÍSTICO:**")
-    
-    di_individuales = reporte_comparacion[reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS']
-    conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
-    con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
-    
-    st.write(f"   • Total DI procesadas: {len(di_individuales)}")
-    st.write(f"   • DI conformes: {conformes}")
-    st.write(f"   • DI con diferencias: {con_diferencias}")
-    
-    # Totales acumulados
-    fila_totales = reporte_comparacion[reporte_comparacion['4. Número DI'] == 'VALORES ACUMULADOS']
-    if not fila_totales.empty:
-        total_di = fila_totales.iloc[0]
-        st.write(f"   • Totales: {total_di['Resultado verificación']}")
-    
-    st.markdown("============================================================")
-
-def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
-    """Muestra resultados simplificados de la validación de anexos - VERSIÓN FINAL"""
-    
-    # Información del proveedor
-    st.markdown("### 👤 Información del Proveedor")
-    if datos_proveedor and 'nit' in datos_proveedor and 'nombre' in datos_proveedor:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("NIT Proveedor", datos_proveedor['nit'])
-        with col2:
-            st.metric("Nombre", datos_proveedor['nombre'][:25] + "..." if len(datos_proveedor['nombre']) > 25 else datos_proveedor['nombre'])
-    else:
-        st.warning("📋 Información del proveedor no disponible")
-    
-    # Resumen por código - FORMATO ORIGINAL
-    st.markdown("### 📊 Resumen por código")
-    if resumen_codigos:
-        for codigo, info in resumen_codigos.items():
-            cantidad = info.get('cantidad', 0)
-            nombre = info.get('nombre', 'DOCUMENTO')
-            st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre}")
-    else:
-        st.info("No hay datos de resumen por código")
-    
-    # 🔍 VALIDACIÓN DE INTEGRIDAD - SOLO SI HAY PROBLEMAS ESPECÍFICOS
-    validacion_integridad = st.session_state.get('validacion_integridad', {})
-    
-    if validacion_integridad:
-        st.markdown("### 🔍 VALIDACIÓN DE INTEGRIDAD")
-        # MOSTRAR INFORMACIÓN REAL DEL SCRIPT PYTHON
-        if 'levantes_duplicados' in validacion_integridad:
-            info = validacion_integridad['levantes_duplicados']
-            st.markdown(f"❌ {info['cantidad']} Levantes duplicados: {info['numero']}")
-        
-        if 'desbalance' in validacion_integridad:
-            info = validacion_integridad['desbalance']
-            st.markdown(f"❌ Desbalance: {info['di']} DI vs {info['levantes']} Levantes")
-    
-    # ANÁLISIS DE INTEGRIDAD - TU FORMATO MEJORADO
-    st.markdown("### 🔍 Análisis de Integridad")
-    
-    if resumen_codigos:
-        di_anexos = resumen_codigos.get('9', {}).get('cantidad', 0)
-        levantes_anexos = resumen_codigos.get('47', {}).get('cantidad', 0)
-        di_procesadas = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
-        
-        # Métricas clave
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("DI en Anexos", di_anexos, 
-                     delta=f"{di_anexos - di_procesadas} faltantes" if di_anexos > di_procesadas else "Completo",
-                     delta_color="normal" if di_anexos == di_procesadas else "off")
-        
-        with col2:
-            st.metric("DI Procesadas", di_procesadas,
-                     delta=f"de {di_anexos} totales")
-        
-        # ANÁLISIS DETALLADO
-        st.markdown("#### 📈 Estado de la Validación")
-        
-        # 1. Balance DI vs Levantes en anexos
-        if di_anexos == levantes_anexos:
-            st.success(f"✅ **Balance correcto** en anexos: {di_anexos} DI = {levantes_anexos} Levantes")
-        else:
-            st.error(f"❌ **Desbalance detectado:** {di_anexos} DI vs {levantes_anexos} Levantes")
-        
-        # 2. Consistencia DI procesadas vs DI en anexos
-        if di_procesadas == di_anexos:
-            st.success(f"✅ **Coincidencia completa:** {di_procesadas} DI procesadas = {di_anexos} DI en anexos")
-        else:
-            st.warning(f"⚠️ **Diferencia encontrada:** {di_procesadas} DI procesadas vs {di_anexos} DI en anexos")
-            st.info(f"   📝 **Faltan por procesar:** {di_anexos - di_procesadas} declaraciones de DI")
-            
-    else:
-        st.warning("No hay datos suficientes para el análisis de integridad")
-
-def mostrar_resumen_final_mejorado():
-    """Muestra resumen final mejorado y consolidado"""
-    
-    st.markdown("---")
-    st.markdown("## 🎯 RESUMEN EJECUTIVO")
-    
-    # Datos clave
-    di_procesadas = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
-    di_anexos = st.session_state.resumen_codigos.get('9', {}).get('cantidad', 0) if st.session_state.resumen_codigos else 0
-    levantes_anexos = st.session_state.resumen_codigos.get('47', {}).get('cantidad', 0) if st.session_state.resumen_codigos else 0
-    errores = st.session_state.estadisticas_validacion.get('declaraciones_con_errores', 0) if st.session_state.estadisticas_validacion else 0
-    correctas = di_procesadas - errores
-    
-    # Tarjetas de resumen ejecutivo
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("DI Procesadas", f"{di_procesadas}/{di_anexos}", 
-                 delta=f"{di_procesadas-di_anexos}" if di_procesadas != di_anexos else "Completo")
-    
-    with col2:
-        st.metric("Validación", f"{correctas}✅", 
-                 delta=f"{errores}❌" if errores > 0 else "Perfecto")
-    
-    with col3:
-        eficiencia = (di_procesadas / di_anexos * 100) if di_anexos > 0 else 0
-        st.metric("Eficiencia", f"{eficiencia:.1f}%")
-    
-    # ANÁLISIS CONSOLIDADO
-    st.markdown("### 📋 Estado Final del Proceso")
-    
-    # Verificar si hay problemas de validación de integridad
-    validacion_integridad = st.session_state.get('validacion_integridad', {})
-    tiene_problemas_criticos = bool(validacion_integridad)
-    
-    if tiene_problemas_criticos:
-        st.error("🚨 **PROCESO COMPLETADO CON PROBLEMAS CRÍTICOS**")
-        st.warning("Se detectaron inconsistencias en la validación de integridad")
-    elif di_procesadas == di_anexos and errores == 0:
-        st.success("🏆 **PROCESO COMPLETADO EXITOSAMENTE**")
-        st.success(f"✅ Todas las {di_procesadas} declaraciones fueron procesadas y validadas correctamente")
-        st.balloons()
-    elif di_procesadas == di_anexos and errores > 0:
-        st.warning("⚠️ **PROCESO COMPLETADO CON OBSERVACIONES**")
-        st.info(f"✅ {correctas} declaraciones correctas | ❌ {errores} con diferencias")
-    else:
-        st.warning("🔍 **PROCESO COMPLETADO CON INCOMPLETITUD**")
-        st.info(f"📊 {di_procesadas} de {di_anexos} DI procesadas | ✅ {correctas} correctas | ❌ {errores} con diferencias")
-        
-        # Mostrar tabla de resultados con resaltado SOLO para diferencias
-        st.markdown("**Detalle por Declaración:**")
-        
-        # Aplicar estilos para resaltar SOLO filas con diferencias
-        def resaltar_solo_diferencias(row):
-            """Resalta SOLO filas que tienen diferencias (❌)"""
-            if '❌' in str(row['Resultado verificación']):
-                return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
-            else:
-                return [''] * len(row)  # Sin resaltado para conformes
-        
-        # Aplicar el estilo
-        styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
-        
-        # Mostrar la tabla con estilos
-        st.dataframe(styled_reporte, use_container_width=True)
-        
-        # Mostrar totales acumulados
-        fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
-        if not fila_totales.empty:
-            st.markdown("**Totales Acumulados:**")
-            st.dataframe(fila_totales, use_container_width=True)
-            
-            # Resaltar también los totales si hay diferencias
-            if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
-                st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
-    else:
-        st.error("No se pudo generar el reporte de comparación")
-
-    # MOSTRAR RESUMEN EN CONSOLA - Validación Anexos (SOLO UNA VEZ)
-    if st.session_state.reporte_anexos is not None:
-        st.subheader("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
-        st.markdown("============================================================")
-        
-        # Mostrar solo los resultados de consola sin el resumen final duplicado
-        mostrar_resultados_consola_anexos_simplificado(
-            st.session_state.reporte_anexos,
-            st.session_state.datos_proveedor,
-            st.session_state.resumen_codigos,
-            st.session_state.estadisticas_validacion
-        )
-
-    # Resultados de Validación de Anexos - TABLA DETALLADA
-    st.subheader("📋 Validación de Anexos y Proveedores")
-    
-    if st.session_state.reporte_anexos is not None:
-        reporte_anexos = st.session_state.reporte_anexos
-        
-        if reporte_anexos is not None and not reporte_anexos.empty:
-            # Mostrar resumen de validación
-            st.markdown("**Resumen de Validación:**")
-            
-            total_campos = len(reporte_anexos)
-            coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
-            no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total campos validados", total_campos)
-            with col2:
-                st.metric("Campos correctos", coincidencias)
-            with col3:
-                st.metric("Campos con diferencias", no_coincidencias)
-            
-            # Mostrar tabla de validación con resaltado SOLO para diferencias
-            st.markdown("**Detalle de Validación:**")
-            
-            def resaltar_solo_validacion_anexos(row):
-                """Resalta SOLO filas que no coinciden en la validación de anexos"""
-                if row['Coincidencias'] == '❌ NO COINCIDE':
-                    return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
-                else:
-                    return [''] * len(row)  # Sin resaltado para coincidencias
-            
-            # Aplicar el estilo
-            styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
-            
-            st.dataframe(styled_anexos, use_container_width=True)
-            
-            # Mostrar resumen por DI para anexos - SOLO mostrar las que requieren atención
-            st.markdown("**Declaraciones que Requieren Atención:**")
-            di_unicos = reporte_anexos['Numero DI'].unique()
-            di_con_problemas = []
-            
-            for di in di_unicos:
-                datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
-                incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
-                
-                if incorrectos > 0:
-                    di_con_problemas.append(di)
-                    st.error(f"DI {di}: {incorrectos} campo(s) con diferencias - **REQUIERE ATENCIÓN**")
-            
-            if not di_con_problemas:
-                st.success("✅ Todas las declaraciones están conformes")
-                    
-        else:
-            st.info("No hay datos de validación de anexos para mostrar")
-    else:
-        st.error("No se pudo generar el reporte de validación de anexos")
-    
-    # MOSTRAR RESUMEN FINAL SOLO UNA VEZ (eliminar la duplicación)
-    st.markdown("==================================================")
-    st.markdown("📊 RESUMEN FINAL DE VALIDACIÓN")
-    st.markdown("==================================================")
-    
-    # Calcular estadísticas finales
-    total_di_dian = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
-    total_di_anexos = st.session_state.estadisticas_validacion.get('total_di', 0) if st.session_state.estadisticas_validacion else 0
-    declaraciones_errores = st.session_state.estadisticas_validacion.get('declaraciones_con_errores', 0) if st.session_state.estadisticas_validacion else 0
-    declaraciones_correctas = total_di_dian - declaraciones_errores
-    
-    st.write(f"   • Total declaraciones procesadas: {total_di_dian} de {total_di_anexos} encontradas en anexos")
-    st.write(f"   • Declaraciones con errores: {declaraciones_errores}")
-    st.write(f"   • Declaraciones correctas: {declaraciones_correctas}")
-    
-    if declaraciones_errores == 0:
-        st.markdown(f"🎯 TODAS LAS {total_di_dian} DECLARACIONES SON CORRECTAS ✅")
-    else:
-        st.markdown(f"⚠️ {declaraciones_errores} DECLARACIONES REQUIEREN ATENCIÓN")
-    
-    st.markdown("🎯 PROCESO COMPLETADO EXITOSAMENTE")
-    st.markdown("========================================================================================================================")
-
-def mostrar_botones_descarga():
-    """Muestra los botones para descargar los Excel"""
-    
-    st.markdown("---")
-    st.header("📥 Descargar Resultados Completos")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.session_state.comparacion_data is not None:
-            # Usar una key única dinámica basada en el contador
-            download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
-            st.download_button(
-                label="📥 Descargar Validación DIM vs Subpartidas (Excel)",
-                data=st.session_state.comparacion_data,
-                file_name="Comparacion_DIM_Subpartidas.xlsx",
-                mime="application/vnd.ms-excel",
-                use_container_width=True,
-                key=download_key_comp
-            )
-        else:
-            st.button(
-                "📊 Comparación No Disponible",
-                disabled=True,
-                use_container_width=True
-            )
-    
-    with col2:
-        if st.session_state.anexos_data is not None:
-            # Usar una key única dinámica basada en el contador
-            download_key_anex = f"download_anexos_{st.session_state.download_counter}"
-            st.download_button(
-                label="📥 Descargar Comparación Anexos FMM (Excel)",
-                data=st.session_state.anexos_data,
-                file_name="Validacion_Anexos_FMM.xlsx", 
-                mime="application/vnd.ms-excel",
-                use_container_width=True,
-                key=download_key_anex
-            )
-        else:
-            st.button(
-                "📋 Validación No Disponible",
-                disabled=True,
-                use_container_width=True
-            )
-
 if __name__ == "__main__":
     main()
      
-
-
-
