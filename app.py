@@ -426,7 +426,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
 def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA Y SIMPLIFICADA"""
     
-   st.markdown("---")
+    st.markdown("---")
     st.header("📊 Resultados de la Conciliación")
     
     # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO (PRIMERO)
@@ -698,5 +698,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
