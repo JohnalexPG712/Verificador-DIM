@@ -568,7 +568,7 @@ def main():
     inicializar_estados()
     
     # Header principal
-    st.title("🚛 Aplicación de Verificación DIM vs FMM")
+    st.title("Aplicación de Verificación DIM vs FMM - SmartDIM 🚀 ")
     
     # Instrucciones en sidebar
     with st.sidebar:
@@ -706,6 +706,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
