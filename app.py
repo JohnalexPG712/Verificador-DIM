@@ -76,13 +76,20 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     """Muestra los resultados de validación en el formato específico solicitado"""
     
     # Información del Proveedor
-    st.markdown("### 👤 Información del Proveedor")
-    nit = datos_proveedor.get('nit', 'No disponible')
-    nombre = datos_proveedor.get('nombre', 'No disponible')
-    st.markdown(f"[**NIT:** {nit}] [**Nombre:** {nombre}]")
-    
+st.markdown("### 👤 Información del Proveedor")
+
+nit = datos_proveedor.get('nit', 'No disponible')
+nombre = datos_proveedor.get('nombre', 'No disponible')
+
+st.markdown(
+    f"""
+    <p>📇 <b>NIT:</b> {nit}</p>
+    <p>🏢 <b>Nombre:</b> {nombre}</p>
+    """,
+    unsafe_allow_html=True
+)
     # Resumen por código
-    st.markdown("### 📊 Resumen por código:")
+    st.markdown("### 📝 Resumen por código:")
     if resumen_codigos:
         for codigo, info in resumen_codigos.items():
             cantidad = info.get('cantidad', 0)
@@ -155,7 +162,7 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
         else:
             st.markdown("✅ **PROCESO COMPLETADO EXITOSAMENTE**")
     
-    st.markdown(f"📊 {total_di_procesadas} de {total_di_anexos} DI procesadas | ✅ {declaraciones_correctas} correctas | ❌ {estadisticas_validacion.get('declaraciones_con_errores', 0)} con diferencias")
+    st.markdown(f"📈 {total_di_procesadas} de {total_di_anexos} DI procesadas | ✅ {declaraciones_correctas} correctas | ❌ {estadisticas_validacion.get('declaraciones_con_errores', 0)} con diferencias")
 
 def extraer_datos_de_consola_mejorado(consola_output):
     """Extrae datos del proveedor de la salida de consola - MEJORADO"""
@@ -220,7 +227,7 @@ def extraer_resumen_de_consola_mejorado(consola_output):
                 en_validacion = False
         
         # Capturar RESUMEN POR CÓDIGO
-        if 'Resumen por código:' in linea or '📊 Resumen por código:' in linea:
+        if 'Resumen por código:' in linea or '📝 Resumen por código:' in linea:
             en_resumen = True
             continue
         
@@ -293,7 +300,7 @@ def mostrar_resumen_comparacion_simplificado(reporte_comparacion, datos_dian, da
     conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
     con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
     
-    st.markdown("### 📊 Resumen Comparación DIM vs Subpartidas")
+    st.markdown("### 📝 Resumen Comparación DIM vs Subpartidas")
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total DI procesadas", len(di_individuales))
@@ -427,7 +434,7 @@ def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA Y SIMPLIFICADA"""
     
     st.markdown("---")
-    st.header("📊 Resultados de la Conciliación")
+    st.header("📋 Resultados de la Verificación")
     
     # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO (PRIMERO)
     if (st.session_state.datos_proveedor is not None and 
@@ -510,7 +517,10 @@ def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
     
     st.markdown("---")
-    st.header("📥 Descargar Resultados Completos")
+    st.markdown(
+    "<h2 style='text-align: center;'>📥 Descargar Resultados Completos</h2>",
+    unsafe_allow_html=True
+)
     
     col1, col2 = st.columns(2)
     
@@ -562,11 +572,11 @@ def main():
     with st.sidebar:
         st.header("Instrucciones de uso")
         st.markdown("""
-        1. **Cargar Declaraciones PDF** (DIAN)
-        2. **Cargar Excel de Subpartidas**
-        3. **Cargar Excel de Anexos FMM** 
-        4. **Ejecutar Verificación**
-        5. **Ver resultados en pantalla y descargar**
+        1. ***Cargar Declaraciones PDF*** (DIAN)
+        2. ***Cargar Excel de Subpartidas***
+        3. ***Cargar Excel de Anexos FMM*** 
+        4. ***Ejecutar Verificación***
+        5. ***Ver resultados en pantalla y descargar***
         """)
         
         # Botón de limpieza
@@ -694,6 +704,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
