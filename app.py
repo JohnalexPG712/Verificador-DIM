@@ -76,28 +76,18 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     """Muestra los resultados de validación en el formato específico solicitado"""
     
 # Información del Proveedor
-st.markdown("### 👤 Información del Proveedor")
-
-nit = datos_proveedor.get('nit', 'No disponible')
-nombre = datos_proveedor.get('nombre', 'No disponible')
-
-st.markdown(
-    f"""
-    <p>📇 <b>NIT:</b> {nit}</p>
-    <p>🏢 <b>Nombre:</b> {nombre}</p>
-    """,
-    unsafe_allow_html=True
-)
-
-# Resumen por código
-st.markdown("### 📝 Resumen por código:")
-if resumen_codigos:
-    for codigo, info in resumen_codigos.items():
-        cantidad = info.get('cantidad', 0)
-        nombre_doc = info.get('nombre', 'DOCUMENTO')
-        st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
-else:
-    st.info("No hay datos disponibles en el resumen de códigos.")
+    st.markdown("### 👤 Información del Proveedor")
+    nit = datos_proveedor.get('nit', 'No disponible')
+    nombre = datos_proveedor.get('nombre', 'No disponible')
+    st.markdown(f"[**NIT:** {nit}] [**Nombre:** {nombre}]")
+    
+    # Resumen por código
+    st.markdown("### 📊 Resumen por código:")
+    if resumen_codigos:
+        for codigo, info in resumen_codigos.items():
+            cantidad = info.get('cantidad', 0)
+            nombre_doc = info.get('nombre', 'DOCUMENTO')
+            st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
 
     
     # Validación de Integridad (si hay problemas críticos)
@@ -708,6 +698,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
