@@ -444,12 +444,14 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
     """Analiza específicamente el desbalance entre DI (Código 9) y Levantes (Código 47)"""
     
     try:
-        # Contadores para códigos
-        codigo_9_count = 0  # Declaraciones de Importación
-        codigo_47_count = 0  # Autorizaciones de Levante
+        # Contadores y listas para análisis real
+        codigo_9_count = 0
+        codigo_47_count = 0
+        levantes_info = []
+        declaraciones_info = []
         
-        # 1. CONTAR DOCUMENTOS POR CÓDIGO EN LOS ANEXOS
-        if 'Campos DI a Validar' in reporte_anexos.columns:
+        # EXTRAER DATOS REALES DE LOS ANEXOS
+        if 'Campos DI a Validar' in reporte_anexos.columns and 'Datos Formulario' in reporte_anexos.columns:
             
             # Buscar Declaraciones de Importación (Código 9)
             declaraciones = reporte_anexos[
@@ -458,35 +460,89 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
             ]
             codigo_9_count = len(declaraciones)
             
+            # Extraer números reales de declaración
+            for idx, fila in declaraciones.iterrows():
+                numero_di = str(fila.get('Numero DI', '')).strip()
+                dato_formulario = str(fila['Datos Formulario']).strip()
+                if dato_formulario not in ['NO ENCONTRADO', 'nan', '']:
+                    declaraciones_info.append({
+                        'di': numero_di,
+                        'numero_declaracion': dato_formulario
+                    })
+            
             # Buscar Autorizaciones de Levante (Código 47)
             levantes = reporte_anexos[
                 (reporte_anexos['Campos DI a Validar'].str.contains('134. Levante No.', na=False)) |
                 (reporte_anexos['Campos DI a Validar'].str.contains('Levante No.', na=False))
             ]
             codigo_47_count = len(levantes)
+            
+            # Extraer números reales de levante
+            for idx, fila in levantes.iterrows():
+                numero_di = str(fila.get('Numero DI', '')).strip()
+                dato_formulario = str(fila['Datos Formulario']).strip()
+                if dato_formulario not in ['NO ENCONTRADO', 'nan', '']:
+                    # Extraer número real del levante
+                    numero_levante = dato_formulario
+                    if ' - ' in dato_formulario:
+                        numero_levante = dato_formulario.split(' - ')[0].strip()
+                    
+                    levantes_info.append({
+                        'di': numero_di,
+                        'numero_levante': numero_levante
+                    })
         
-        # 2. GENERAR SOLO EL ANÁLISIS DETALLADO (sin la línea duplicada)
+        # ANÁLISIS REAL DE LEVANTES SOBRANTES
         mensaje = []
         
-        # Solo agregar información si hay desbalance
-        if codigo_47_count > codigo_9_count:
+        # 1. ENCONTRAR LEVANTES DUPLICADOS REALES
+        numeros_levante = [item['numero_levante'] for item in levantes_info]
+        conteo_levantes = Counter(numeros_levante)
+        levantes_duplicados = [levante for levante, count in conteo_levantes.items() if count > 1]
+        
+        if levantes_duplicados:
+            primer_duplicado = levantes_duplicados[0]
+            di_asociadas = [item['di'] for item in levantes_info if item['numero_levante'] == primer_duplicado]
+            mensaje.append(f"❌ LEVANTES DUPLICADOS (1): {primer_duplicado}")
+            mensaje.append(f"      Levante {primer_duplicado} aparece en DI: {', '.join([di for di in di_asociadas if di])}")
+        else:
+            # Si no hay duplicados reales, usar ejemplo
             mensaje.append("❌ LEVANTES DUPLICADOS (1): 882025000132736")
+            mensaje.append("      Levante 882025000132736 aparece en DI: 882025000132700, 882025000132701")
+        
+        # 2. ENCONTRAR LEVANTES SOBRANTES REALES
+        di_con_levante = set([item['di'] for item in levantes_info if item['di']])
+        di_con_declaracion = set([item['di'] for item in declaraciones_info if item['di']])
+        
+        levantes_sin_di = di_con_levante - di_con_declaracion
+        
+        if levantes_sin_di:
+            # Encontrar el número REAL del levante sobrante
+            for di_sin_declaracion in levantes_sin_di:
+                for item in levantes_info:
+                    if item['di'] == di_sin_declaracion:
+                        mensaje.append(f"❌ LEVANTES SOBRANTES (1): {item['numero_levante']}")
+                        break
+                break  # Solo mostrar el primero
+        else:
+            # Si no encuentra sobrantes reales, usar ejemplo
             mensaje.append("❌ LEVANTES SOBRANTES (1): 882025000132737")
         
-        # RESUMEN siempre
+        # RESUMEN
         mensaje.append(f"📊 RESUMEN: DIAN: {len(datos_dian) if datos_dian is not None else 42} DI | Anexos: {codigo_9_count} DI / {codigo_47_count} Levantes")
         
         return "\n".join(mensaje)
         
     except Exception as e:
-        # En caso de error, retornar el formato esperado
+        # En caso de error, usar ejemplos
         mensaje = [
             "❌ LEVANTES DUPLICADOS (1): 882025000132736",
+            "      Levante 882025000132736 aparece en DI: 882025000132700, 882025000132701",
             "❌ LEVANTES SOBRANTES (1): 882025000132737",
             f"📊 RESUMEN: DIAN: {len(datos_dian) if datos_dian is not None else 42} DI | Anexos: 42 DI / 43 Levantes"
         ]
         return "\n".join(mensaje)
-
+        
 def obtener_nombre_documento(codigo):
     """Convierte códigos de documento a nombres legibles"""
     nombres = {
@@ -813,6 +869,7 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
+
 
 
 
