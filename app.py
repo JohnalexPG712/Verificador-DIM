@@ -520,121 +520,130 @@ def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, dat
     st.markdown("============================================================")
 
 def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
-    """Muestra resultados simplificados de la validación de anexos en el formato específico"""
+    """Muestra resultados simplificados de la validación de anexos - VERSIÓN FINAL"""
     
     # Información del proveedor
-    st.markdown("👤 Extrayendo información del proveedor...")
-    
+    st.markdown("### 👤 Información del Proveedor")
     if datos_proveedor and 'nit' in datos_proveedor and 'nombre' in datos_proveedor:
-        st.markdown(f"📋 Información encontrada: Proveedor/Cliente: {datos_proveedor['nit']} - {datos_proveedor['nombre']}")
-        st.markdown("✅ PROVEEDOR VÁLIDO:")
-        st.markdown(f"   🆔 NIT: {datos_proveedor['nit']}")
-        st.markdown(f"   📛 Nombre: {datos_proveedor['nombre']}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("NIT Proveedor", datos_proveedor['nit'])
+        with col2:
+            st.metric("Nombre", datos_proveedor['nombre'][:25] + "..." if len(datos_proveedor['nombre']) > 25 else datos_proveedor['nombre'])
     else:
-        st.markdown("📋 Información del proveedor: No disponible")
+        st.warning("📋 Información del proveedor no disponible")
     
-    # Información de anexos
-    st.markdown("📖 Extrayendo anexos del formulario...")
-    
-    if estadisticas_validacion and 'total_anexos' in estadisticas_validacion:
-        st.markdown(f"✅ {estadisticas_validacion['total_anexos']} anexos encontrados")
-    else:
-        total_anexos = len(reporte_anexos) if reporte_anexos is not None else 0
-        st.markdown(f"✅ {total_anexos} anexos encontrados")
-    
-    # Resumen por código
-    st.markdown("📊 Resumen por código:")
-    
+    # Resumen por código - FORMATO ORIGINAL
+    st.markdown("### 📊 Resumen por código")
     if resumen_codigos:
         for codigo, info in resumen_codigos.items():
             cantidad = info.get('cantidad', 0)
             nombre = info.get('nombre', 'DOCUMENTO')
-            st.markdown(f"   • Código {codigo}: {cantidad} - {nombre}")
+            st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre}")
     else:
-        # Valores por defecto basados en el ejemplo
-        st.markdown("   • Código 6: 1 - FACTURA COMERCIAL")
-        st.markdown("   • Código 9: 42 - DECLARACION DE IMPORTACION")
-        st.markdown("   • Código 17: 1 - DOCUMENTO DE TRANSPORTE")
-        st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
-        st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
+        st.info("No hay datos de resumen por código")
     
-    # Validación de integridad - USAR INFORMACIÓN REAL DEL SCRIPT PYTHON
-    st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
-    
-    # Obtener la validación de integridad que capturamos de la consola
+    # 🔍 VALIDACIÓN DE INTEGRIDAD - SOLO SI HAY PROBLEMAS ESPECÍFICOS
     validacion_integridad = st.session_state.get('validacion_integridad', {})
     
     if validacion_integridad:
+        st.markdown("### 🔍 VALIDACIÓN DE INTEGRIDAD")
         # MOSTRAR INFORMACIÓN REAL DEL SCRIPT PYTHON
         if 'levantes_duplicados' in validacion_integridad:
             info = validacion_integridad['levantes_duplicados']
-            st.markdown(f"   ❌ {info['cantidad']} Levantes duplicados: {info['numero']}")
+            st.markdown(f"❌ {info['cantidad']} Levantes duplicados: {info['numero']}")
         
         if 'desbalance' in validacion_integridad:
             info = validacion_integridad['desbalance']
-            st.markdown(f"   ❌ Desbalance: {info['di']} DI vs {info['levantes']} Levantes")
-    else:
-        # Si no hay información de validación, usar el método anterior como fallback
-        tiene_desbalance = False
-        di_count = 0
-        levantes_count = 0
+            st.markdown(f"❌ Desbalance: {info['di']} DI vs {info['levantes']} Levantes")
+    
+    # ANÁLISIS DE INTEGRIDAD - TU FORMATO MEJORADO
+    st.markdown("### 🔍 Análisis de Integridad")
+    
+    if resumen_codigos:
+        di_anexos = resumen_codigos.get('9', {}).get('cantidad', 0)
+        levantes_anexos = resumen_codigos.get('47', {}).get('cantidad', 0)
+        di_procesadas = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
         
-        if resumen_codigos:
-            di_count = resumen_codigos.get('9', {}).get('cantidad', 0)
-            levantes_count = resumen_codigos.get('47', {}).get('cantidad', 0)
-            
-            if di_count != levantes_count:
-                tiene_desbalance = True
+        # Métricas clave
+        col1, col2 = st.columns(2)
         
-        if tiene_desbalance:
-            st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
+        with col1:
+            st.metric("DI en Anexos", di_anexos, 
+                     delta=f"{di_anexos - di_procesadas} faltantes" if di_anexos > di_procesadas else "Completo",
+                     delta_color="normal" if di_anexos == di_procesadas else "off")
+        
+        with col2:
+            st.metric("DI Procesadas", di_procesadas,
+                     delta=f"de {di_anexos} totales")
+        
+        # ANÁLISIS DETALLADO
+        st.markdown("#### 📈 Estado de la Validación")
+        
+        # 1. Balance DI vs Levantes en anexos
+        if di_anexos == levantes_anexos:
+            st.success(f"✅ **Balance correcto** en anexos: {di_anexos} DI = {levantes_anexos} Levantes")
         else:
-            st.markdown("   ✅ Balance correcto entre DI y Levantes")
-    
-    # Información de declaraciones
-    total_di_dian = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
-    total_di_anexos = estadisticas_validacion.get('total_di', 0) if estadisticas_validacion else 0
-    
-    st.markdown(f"📋 Declaraciones encontradas: {total_di_anexos}")
-    st.markdown(f"📋 {total_di_dian} declaraciones procesadas de {total_di_anexos} encontradas en anexos")
-    st.markdown(f"🔍 Validando {total_di_dian} declaraciones...")
+            st.error(f"❌ **Desbalance detectado:** {di_anexos} DI vs {levantes_anexos} Levantes")
+        
+        # 2. Consistencia DI procesadas vs DI en anexos
+        if di_procesadas == di_anexos:
+            st.success(f"✅ **Coincidencia completa:** {di_procesadas} DI procesadas = {di_anexos} DI en anexos")
+        else:
+            st.warning(f"⚠️ **Diferencia encontrada:** {di_procesadas} DI procesadas vs {di_anexos} DI en anexos")
+            st.info(f"   📝 **Faltan por procesar:** {di_anexos - di_procesadas} declaraciones de DI")
+            
+    else:
+        st.warning("No hay datos suficientes para el análisis de integridad")
 
-def mostrar_resultados_en_pantalla():
-    """Muestra los resultados detallados en pantalla usando session_state"""
+def mostrar_resumen_final_mejorado():
+    """Muestra resumen final mejorado y consolidado"""
     
     st.markdown("---")
-    st.header("📊 Resultados de la Conciliación")
+    st.markdown("## 🎯 RESUMEN EJECUTIVO")
     
-    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas (SOLO UNA VEZ)
-    if st.session_state.reporte_comparacion is not None:
-        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
-        st.markdown("============================================================")
-        mostrar_resultados_consola_comparacion_simplificado(
-            st.session_state.reporte_comparacion, 
-            st.session_state.datos_dian, 
-            st.session_state.datos_subpartidas
-        )
+    # Datos clave
+    di_procesadas = len(st.session_state.datos_dian) if st.session_state.datos_dian is not None else 0
+    di_anexos = st.session_state.resumen_codigos.get('9', {}).get('cantidad', 0) if st.session_state.resumen_codigos else 0
+    levantes_anexos = st.session_state.resumen_codigos.get('47', {}).get('cantidad', 0) if st.session_state.resumen_codigos else 0
+    errores = st.session_state.estadisticas_validacion.get('declaraciones_con_errores', 0) if st.session_state.estadisticas_validacion else 0
+    correctas = di_procesadas - errores
     
-    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA
-    st.subheader("🔍 Comparación DIM vs Subpartidas")
+    # Tarjetas de resumen ejecutivo
+    col1, col2, col3 = st.columns(3)
     
-    if st.session_state.reporte_comparacion is not None:
-        reporte = st.session_state.reporte_comparacion
-        
-        # Mostrar resumen estadístico
-        st.markdown("**Resumen Estadístico:**")
-        
-        di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
-        conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
-        con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total DI procesadas", len(di_individuales))
-        with col2:
-            st.metric("DI conformes", conformes)
-        with col3:
-            st.metric("DI con diferencias", con_diferencias)
+    with col1:
+        st.metric("DI Procesadas", f"{di_procesadas}/{di_anexos}", 
+                 delta=f"{di_procesadas-di_anexos}" if di_procesadas != di_anexos else "Completo")
+    
+    with col2:
+        st.metric("Validación", f"{correctas}✅", 
+                 delta=f"{errores}❌" if errores > 0 else "Perfecto")
+    
+    with col3:
+        eficiencia = (di_procesadas / di_anexos * 100) if di_anexos > 0 else 0
+        st.metric("Eficiencia", f"{eficiencia:.1f}%")
+    
+    # ANÁLISIS CONSOLIDADO
+    st.markdown("### 📋 Estado Final del Proceso")
+    
+    # Verificar si hay problemas de validación de integridad
+    validacion_integridad = st.session_state.get('validacion_integridad', {})
+    tiene_problemas_criticos = bool(validacion_integridad)
+    
+    if tiene_problemas_criticos:
+        st.error("🚨 **PROCESO COMPLETADO CON PROBLEMAS CRÍTICOS**")
+        st.warning("Se detectaron inconsistencias en la validación de integridad")
+    elif di_procesadas == di_anexos and errores == 0:
+        st.success("🏆 **PROCESO COMPLETADO EXITOSAMENTE**")
+        st.success(f"✅ Todas las {di_procesadas} declaraciones fueron procesadas y validadas correctamente")
+        st.balloons()
+    elif di_procesadas == di_anexos and errores > 0:
+        st.warning("⚠️ **PROCESO COMPLETADO CON OBSERVACIONES**")
+        st.info(f"✅ {correctas} declaraciones correctas | ❌ {errores} con diferencias")
+    else:
+        st.warning("🔍 **PROCESO COMPLETADO CON INCOMPLETITUD**")
+        st.info(f"📊 {di_procesadas} de {di_anexos} DI procesadas | ✅ {correctas} correctas | ❌ {errores} con diferencias")
         
         # Mostrar tabla de resultados con resaltado SOLO para diferencias
         st.markdown("**Detalle por Declaración:**")
@@ -808,5 +817,6 @@ def mostrar_botones_descarga():
 if __name__ == "__main__":
     main()
      
+
 
 
