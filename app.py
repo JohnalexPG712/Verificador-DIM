@@ -113,7 +113,7 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     total_di_procesadas = estadisticas_validacion.get('total_di_dian', 0)
     di_faltantes = total_di_anexos - total_di_procesadas
     
-    st.markdown(f"[**DI en Anexos:** {total_di_anexos} -{di_faltantes} faltantes] [**DI Procesadas:** {total_di_procesadas} de {total_di_anexos} totales]")
+    st.markdown(f" **DI en Anexos:** {total_di_anexos} -{di_faltantes} faltantes \n **DI Procesadas:** {total_di_procesadas} de {total_di_anexos} totales")
     
     # Estado de la Validación
     st.markdown("### 📋 Estado de la Validación")
@@ -699,6 +699,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
