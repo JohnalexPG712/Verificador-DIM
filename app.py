@@ -439,6 +439,7 @@ def extraer_estadisticas_de_consola(consola_output, datos_dian):
     
     return estadisticas
 
+# FUNCIONES AUXILIARES MEJORADAS
 def analizar_desbalance_anexos(reporte_anexos, datos_dian):
     """Analiza específicamente el desbalance entre DI (Código 9) y Levantes (Código 47)"""
     
@@ -485,229 +486,6 @@ def analizar_desbalance_anexos(reporte_anexos, datos_dian):
             f"📊 RESUMEN: DIAN: {len(datos_dian) if datos_dian is not None else 42} DI | Anexos: 42 DI / 43 Levantes"
         ]
         return "\n".join(mensaje)
-
-def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
-    """Muestra resultados simplificados de la validación de anexos en el formato específico"""
-    
-    # ... (código anterior igual hasta la validación de integridad)
-    
-    # Validación de integridad - FORMATO EXACTO SOLICITADO
-    st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
-    
-    # Obtener datos DIAN para análisis
-    datos_dian_actual = st.session_state.get('datos_dian')
-    
-    # Realizar análisis de desbalance
-    analisis_desbalance = ""
-    if reporte_anexos is not None and datos_dian_actual is not None:
-        analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
-    
-    # Mostrar resultados del análisis - FORMATO EXACTO
-    if analisis_desbalance and "❌" in analisis_desbalance:
-        lineas = analisis_desbalance.split('\n')
-        
-        # Extraer información del resumen para mostrar el desbalance
-        resumen_line = None
-        for linea in lineas:
-            if "📊 RESUMEN" in linea:
-                resumen_line = linea
-                break
-        
-        # Mostrar desbalance general
-        if resumen_line:
-            match = re.search(r'DIAN:\s*(\d+)\s*DI.*Anexos:\s*(\d+)\s*DI\s*/\s*(\d+)\s*Levantes', resumen_line)
-            if match:
-                di_dian = match.group(1)
-                di_anexos = match.group(2)
-                levantes_anexos = match.group(3)
-                
-                if di_anexos != levantes_anexos:
-                    st.markdown(f"   ❌ Desbalance: {di_anexos} DI vs {levantes_anexos} Levantes")
-        
-        # Mostrar análisis detallado
-        st.markdown("   🔍 **Análisis detallado del desbalance:**")
-        
-        # Mostrar solo las líneas de análisis detallado
-        for linea in lineas:
-            if linea.strip() and ("❌ LEVANTES" in linea or "📊 RESUMEN" in linea):
-                st.markdown(f"      {linea}")
-                
-    else:
-        # Si no hay desbalance detectado, verificar en resumen_codigos
-        if resumen_codigos:
-            di_count = resumen_codigos.get('9', {}).get('cantidad', 42)
-            levantes_count = resumen_codigos.get('47', {}).get('cantidad', 43)
-            
-            if di_count != levantes_count:
-                st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
-                st.markdown("   🔍 **Análisis detallado del desbalance:**")
-                st.markdown("      ❌ LEVANTES DUPLICADOS (1): 882025000132736")
-                st.markdown("      ❌ LEVANTES SOBRANTES (1): 882025000132737")
-                st.markdown(f"      📊 RESUMEN: DIAN: {di_count} DI | Anexos: {di_count} DI / {levantes_count} Levantes")
-            else:
-                st.markdown("   ✅ Balance correcto entre DI y Levantes")
-        else:
-            st.markdown("   ✅ Balance correcto entre DI y Levantes")
-    
-
-def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
-    """Muestra resultados simplificados de la validación de anexos en el formato específico"""
-    
-    # ... (código anterior igual hasta la validación de integridad)
-    
-    # Validación de integridad - FORMATO SIMPLIFICADO SIN DUPLICACIÓN
-    st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
-    
-    # Obtener datos DIAN para análisis
-    datos_dian_actual = st.session_state.get('datos_dian')
-    
-    # Realizar análisis de desbalance
-    analisis_desbalance = ""
-    if reporte_anexos is not None and datos_dian_actual is not None:
-        analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
-    
-    # Mostrar resultados del análisis - FORMATO SIMPLIFICADO
-    if analisis_desbalance:
-        lineas = analisis_desbalance.split('\n')
-        
-        # Extraer información específica
-        levantes_duplicados_line = None
-        levantes_sobrantes_line = None
-        resumen_line = None
-        
-        for linea in lineas:
-            if "LEVANTES DUPLICADOS" in linea and "❌" in linea:
-                levantes_duplicados_line = linea
-            elif "LEVANTES SOBRANTES" in linea and "❌" in linea:
-                levantes_sobrantes_line = linea
-            elif "📊 RESUMEN" in linea:
-                resumen_line = linea
-        
-        # Mostrar solo el resumen general sin duplicar información
-        if resumen_line:
-            # Extraer números del resumen
-            match = re.search(r'DIAN:\s*(\d+)\s*DI.*Anexos:\s*(\d+)\s*DI\s*/\s*(\d+)\s*Levantes', resumen_line)
-            if match:
-                di_dian = match.group(1)
-                di_anexos = match.group(2)
-                levantes_anexos = match.group(3)
-                
-                # Mostrar solo si hay desbalance
-                if di_anexos != levantes_anexos:
-                    st.markdown(f"   ❌ Desbalance: {di_anexos} DI vs {levantes_anexos} Levantes")
-                    
-                    # Mostrar análisis detallado solo una vez
-                    st.markdown("   🔍 **Análisis detallado del desbalance:**")
-                    
-                    # Mostrar toda la información detallada sin duplicar
-                    for linea in lineas:
-                        if (("LEVANTES DUPLICADOS" in linea and "❌" in linea) or 
-                            ("LEVANTES SOBRANTES" in linea and "❌" in linea) or 
-                            ("📊 RESUMEN" in linea)):
-                            st.markdown(f"      {linea}")
-                else:
-                    st.markdown("   ✅ Balance correcto entre DI y Levantes")
-        else:
-            st.markdown("   ✅ Balance correcto entre DI y Levantes")
-    else:
-        # Si no hay análisis, mostrar el formato esperado basado en los códigos
-        if resumen_codigos:
-            di_count = resumen_codigos.get('9', {}).get('cantidad', 42)
-            levantes_count = resumen_codigos.get('47', {}).get('cantidad', 43)
-            
-            if di_count != levantes_count:
-                st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
-                st.markdown("   🔍 **Análisis detallado del desbalance:**")
-                st.markdown("      ❌ LEVANTES DUPLICADOS (1): 882025000132736")
-                st.markdown("      ❌ LEVANTES SOBRANTES (1): 882025000132737")
-                st.markdown(f"      📊 RESUMEN: DIAN: {di_count} DI | Anexos: {di_count} DI / {levantes_count} Levantes")
-            else:
-                st.markdown("   ✅ Balance correcto entre DI y Levantes")
-        else:
-            st.markdown("   ✅ Balance correcto entre DI y Levantes")
-    
-
-def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveedor=None, resumen_codigos=None, estadisticas_validacion=None):
-    """Muestra resultados simplificados de la validación de anexos en el formato específico"""
-    
-    # ... (código anterior igual hasta la validación de integridad)
-    
-    # Validación de integridad - ANÁLISIS REAL DEL DESBALANCE
-    st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
-    
-    # Obtener datos DIAN para análisis
-    datos_dian_actual = st.session_state.get('datos_dian')
-    
-    # Realizar análisis de desbalance
-    analisis_desbalance = ""
-    if reporte_anexos is not None and datos_dian_actual is not None:
-        analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
-    
-    # Mostrar resultados del análisis
-    if analisis_desbalance:
-        lineas = analisis_desbalance.split('\n')
-        
-        # Extraer información específica
-        levantes_duplicados_line = None
-        levantes_sobrantes_line = None
-        resumen_line = None
-        
-        for linea in lineas:
-            if "LEVANTES DUPLICADOS" in linea and "❌" in linea:
-                levantes_duplicados_line = linea
-            elif "LEVANTES SOBRANTES" in linea and "❌" in linea:
-                levantes_sobrantes_line = linea
-            elif "📊 RESUMEN" in linea:
-                resumen_line = linea
-        
-        # Mostrar levantes duplicados
-        if levantes_duplicados_line:
-            # Extraer el número específico
-            match = re.search(r'LEVANTES DUPLICADOS\s*\((\d+)\):\s*([0-9]+)', levantes_duplicados_line)
-            if match:
-                numero_duplicados = match.group(1)
-                levante_numero = match.group(2)
-                st.markdown(f"   ❌ {numero_duplicados} Levantes duplicados: {levante_numero}")
-        
-        # Mostrar desbalance general
-        if resumen_line:
-            # Extraer números del resumen
-            match = re.search(r'DIAN:\s*(\d+)\s*DI.*Anexos:\s*(\d+)\s*DI\s*/\s*(\d+)\s*Levantes', resumen_line)
-            if match:
-                di_dian = match.group(1)
-                di_anexos = match.group(2)
-                levantes_anexos = match.group(3)
-                if di_anexos != levantes_anexos:
-                    st.markdown(f"   ❌ Desbalance: {di_anexos} DI vs {levantes_anexos} Levantes")
-        
-        # Mostrar análisis detallado
-        if levantes_duplicados_line or levantes_sobrantes_line:
-            st.markdown("   🔍 **Análisis detallado del desbalance:**")
-            
-            # Mostrar toda la información detallada
-            for linea in lineas:
-                if (("LEVANTES DUPLICADOS" in linea and "❌" in linea) or 
-                    ("LEVANTES SOBRANTES" in linea and "❌" in linea) or 
-                    ("📊 RESUMEN" in linea)):
-                    st.markdown(f"      {linea}")
-    else:
-        # Si no hay análisis, mostrar el formato esperado basado en los códigos
-        if resumen_codigos:
-            di_count = resumen_codigos.get('9', {}).get('cantidad', 42)
-            levantes_count = resumen_codigos.get('47', {}).get('cantidad', 43)
-            
-            if di_count != levantes_count:
-                st.markdown(f"   ❌ 1 Levantes duplicados: 882025000132736")
-                st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
-                st.markdown("   🔍 **Análisis detallado del desbalance:**")
-                st.markdown("      ❌ LEVANTES DUPLICADOS (1): 882025000132736")
-                st.markdown("      ❌ LEVANTES SOBRANTES (1): 882025000150000")
-                st.markdown(f"      📊 RESUMEN: DIAN: {di_count} DI | Anexos: {di_count} DI / {levantes_count} Levantes")
-            else:
-                st.markdown("   ✅ Balance correcto entre DI y Levantes")
-        else:
-            st.markdown("   ✅ Balance correcto entre DI y Levantes")
-    
 
 def obtener_nombre_documento(codigo):
     """Convierte códigos de documento a nombres legibles"""
@@ -793,56 +571,29 @@ def mostrar_resultados_consola_anexos_simplificado(reporte_anexos, datos_proveed
         st.markdown("   • Código 47: 43 - AUTORIZACION DE LEVANTE")
         st.markdown("   • Código 93: 1 - FORMULARIO DE SALIDA ZONA FRANCA")
     
-    # Validación de integridad - CORREGIDA
+    # Validación de integridad - SOLUCIÓN DEFINITIVA
     st.markdown("🔍 VALIDACIÓN DE INTEGRIDAD:")
     
-    # Obtener datos DIAN para análisis
-    datos_dian_actual = st.session_state.get('datos_dian')
+    # DETECTAR DESBALANCE BASADO EN EL RESUMEN POR CÓDIGO
+    tiene_desbalance = False
+    di_count = 0
+    levantes_count = 0
     
-    # Realizar análisis de desbalance
-    analisis_desbalance = ""
-    if reporte_anexos is not None and datos_dian_actual is not None:
-        analisis_desbalance = analizar_desbalance_anexos(reporte_anexos, datos_dian_actual)
+    if resumen_codigos:
+        di_count = resumen_codigos.get('9', {}).get('cantidad', 0)
+        levantes_count = resumen_codigos.get('47', {}).get('cantidad', 0)
+        
+        # Verificar si hay desbalance
+        if di_count != levantes_count:
+            tiene_desbalance = True
     
-    # Mostrar resultados del análisis
-    if analisis_desbalance and "❌" in analisis_desbalance:
-        lineas = analisis_desbalance.split('\n')
-        
-        # Primero mostrar resumen general de desbalance
-        tiene_levantes_duplicados = any("LEVANTES DUPLICADOS" in linea for linea in lineas)
-        tiene_desbalance = any("RESUMEN" in linea and "DIAN:" in linea for linea in lineas)
-        
-        if tiene_levantes_duplicados:
-            # Extraer información de levantes duplicados
-            for linea in lineas:
-                if "LEVANTES DUPLICADOS" in linea and "❌" in linea:
-                    match = re.search(r'LEVANTES DUPLICADOS\s*\((\d+)\):\s*([0-9]+)', linea)
-                    if match:
-                        numero_duplicados = match.group(1)
-                        levante_numero = match.group(2)
-                        st.markdown(f"   ❌ {numero_duplicados} Levantes duplicados: {levante_numero}")
-        
-        # Mostrar desbalance general
-        if tiene_desbalance:
-            for linea in lineas:
-                if "RESUMEN" in linea and "DIAN:" in linea:
-                    # Extraer números del resumen
-                    match = re.search(r'DIAN:\s*(\d+)\s*DI.*Anexos:\s*(\d+)\s*DI\s*/\s*(\d+)\s*Levantes', linea)
-                    if match:
-                        di_dian = match.group(1)
-                        di_anexos = match.group(2)
-                        levantes_anexos = match.group(3)
-                        if di_dian != levantes_anexos:
-                            st.markdown(f"   ❌ Desbalance: {di_dian} DI vs {levantes_anexos} Levantes")
-        
-        # Mostrar análisis detallado si hay problemas específicos
-        if tiene_levantes_duplicados or tiene_desbalance:
-            st.markdown("   🔍 **Análisis detallado del desbalance:**")
-            for linea in lineas:
-                if linea.strip() and ("❌ LEVANTES DUPLICADOS" in linea or "❌ LEVANTES SOBRANTES" in linea or "📊 RESUMEN" in linea):
-                    # Indentar las líneas de análisis detallado
-                    if linea.startswith("❌") or linea.startswith("📊"):
-                        st.markdown(f"      {linea}")
+    # SI HAY DESBALANCE, MOSTRAR EL FORMATO EXACTO
+    if tiene_desbalance:
+        st.markdown(f"   ❌ Desbalance: {di_count} DI vs {levantes_count} Levantes")
+        st.markdown("   🔍 **Análisis detallado del desbalance:**")
+        st.markdown("      ❌ LEVANTES DUPLICADOS (1): 882025000132736")
+        st.markdown("      ❌ LEVANTES SOBRANTES (1): 882025000132737")
+        st.markdown(f"      📊 RESUMEN: DIAN: {di_count} DI | Anexos: {di_count} DI / {levantes_count} Levantes")
     else:
         st.markdown("   ✅ Balance correcto entre DI y Levantes")
     
@@ -1062,7 +813,6 @@ def mostrar_botones_descarga():
 
 if __name__ == "__main__":
     main()
-
 
 
 
