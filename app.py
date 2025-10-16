@@ -563,20 +563,15 @@ def main():
     st.title("🚢 Aplicación de Verificación DIM vs FMM")
     
     # Instrucciones en sidebar
-     with st.sidebar:
-        st.header("🧭 Instrucciones de uso")
-        st.markdown(
-            """
-            <ul style='font-size:12px; line-height:1.6; padding-left:20px;'>
-                <li><b>Cargar Declaraciones PDF</b> (DIAN)</li>
-                <li><b>Cargar Excel de Subpartidas</b></li>
-                <li><b>Cargar Excel de Anexos FMM</b></li>
-                <li><b>Ejecutar Verificación</b></li>
-                <li><b>Ver resultados en pantalla y descargar</b></li>
-            </ul>
-            """,
-            unsafe_allow_html=True
-        )
+    with st.sidebar:
+        st.header("Instrucciones de uso")
+        st.markdown("""
+        1. **Cargar Declaraciones PDF** (DIAN)
+        2. **Cargar Excel de Subpartidas**
+        3. **Cargar Excel de Anexos FMM** 
+        4. **Ejecutar Verificación**
+        5. **Ver resultados en pantalla y descargar**
+        """)
         
         # Botón de limpieza
         if st.button("🧹 Limpiar Todo y Reiniciar", type="secondary", use_container_width=True):
@@ -703,6 +698,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
