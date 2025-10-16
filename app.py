@@ -75,7 +75,7 @@ def inicializar_estados():
 def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, estadisticas_validacion, validacion_integridad):
     """Muestra los resultados de validación en el formato específico solicitado"""
     
-    # Información del Proveedor
+# Información del Proveedor
 st.markdown("### 👤 Información del Proveedor")
 
 nit = datos_proveedor.get('nit', 'No disponible')
@@ -88,13 +88,17 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-    # Resumen por código
-    st.markdown("### 📝 Resumen por código:")
-    if resumen_codigos:
-        for codigo, info in resumen_codigos.items():
-            cantidad = info.get('cantidad', 0)
-            nombre_doc = info.get('nombre', 'DOCUMENTO')
-            st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
+
+# Resumen por código
+st.markdown("### 📝 Resumen por código:")
+if resumen_codigos:
+    for codigo, info in resumen_codigos.items():
+        cantidad = info.get('cantidad', 0)
+        nombre_doc = info.get('nombre', 'DOCUMENTO')
+        st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
+else:
+    st.info("No hay datos disponibles en el resumen de códigos.")
+
     
     # Validación de Integridad (si hay problemas críticos)
     tiene_problemas_criticos = False
@@ -704,6 +708,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
