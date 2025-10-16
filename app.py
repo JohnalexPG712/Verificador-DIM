@@ -279,53 +279,28 @@ def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
     return estadisticas
 
 # =============================================================================
-# FUNCIONES AUXILIARES EXISTENTES (MANTENIDAS)
+# FUNCIONES AUXILIARES EXISTENTES (SIMPLIFICADAS)
 # =============================================================================
 
-def obtener_nombre_documento(codigo):
-    """Convierte códigos de documento a nombres legibles"""
-    nombres = {
-        '6': 'FACTURA COMERCIAL',
-        '9': 'DECLARACION DE IMPORTACION', 
-        '17': 'DOCUMENTO DE TRANSPORTE',
-        '47': 'AUTORIZACION DE LEVANTE',
-        '93': 'FORMULARIO DE SALIDA ZONA FRANCA',
-        'coincidentes': 'CAMPOS COINCIDENTES',
-        'no_coincidentes': 'CAMPOS NO COINCIDENTES'
-    }
-    return nombres.get(str(codigo), f'DOCUMENTO {codigo}')
-
-def mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
-    """Muestra resultados simplificados de la comparación sin detalle por declaración"""
+def mostrar_resumen_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
+    """Muestra solo el resumen esencial de la comparación DIM vs Subpartidas"""
     
     if reporte_comparacion is None or reporte_comparacion.empty:
-        st.error("No hay datos de comparación para mostrar")
         return
     
-    # Mostrar información de extracción
-    st.markdown("📄 **EXTRACCIÓN DE DATOS DE PDFs (DIM)...**")
-    st.markdown("📄 **EXTRACCIÓN DE DATOS DE EXCEL (SUBPARTIDAS)...**")
-    st.write(f"✅ Datos DIM extraídos: {len(datos_dian)} registros")
-    st.write(f"✅ Datos Subpartidas extraídos: {len(datos_subpartidas)} registros")
-    
-    # Resumen estadístico
-    st.markdown("📈 **RESUMEN ESTADÍSTICO:**")
-    
+    # Resumen estadístico simplificado
     di_individuales = reporte_comparacion[reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS']
     conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
     con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
     
-    st.write(f"   • Total DI procesadas: {len(di_individuales)}")
-    st.write(f"   • DI conformes: {conformes}")
-    st.write(f"   • DI con diferencias: {con_diferencias}")
-    
-    # Totales acumulados
-    fila_totales = reporte_comparacion[reporte_comparacion['4. Número DI'] == 'VALORES ACUMULADOS']
-    if not fila_totales.empty:
-        total_di = fila_totales.iloc[0]
-        st.write(f"   • Totales: {total_di['Resultado verificación']}")
-    
-    st.markdown("============================================================")
+    st.markdown("### 📊 Resumen Comparación DIM vs Subpartidas")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total DI procesadas", len(di_individuales))
+    with col2:
+        st.metric("DI conformes", conformes)
+    with col3:
+        st.metric("DI con diferencias", con_diferencias)
 
 # =============================================================================
 # FUNCIONES PRINCIPALES ACTUALIZADAS
@@ -376,12 +351,6 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
                 datos_dian, datos_subpartidas, output_comparacion
             )
 
-            # MOSTRAR RESULTADOS EN CONSOLA - Comparación DIM vs Subpartidas
-            st.markdown("---")
-            st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
-            st.markdown("============================================================")
-            mostrar_resultados_consola_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas)
-
             # Procesar validación de anexos
             st.info("📋 Validando anexos FMM...")
             
@@ -416,17 +385,6 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
                 estadisticas_validacion = resultado_validacion.get('estadisticas_validacion', estadisticas_validacion)
             else:
                 reporte_anexos = resultado_validacion
-
-            # MOSTRAR RESULTADOS EN EL NUEVO FORMATO
-            st.subheader("📋 RESULTADOS DE VALIDACIÓN - FORMATO ESPECÍFICO")
-            st.markdown("============================================================")
-            
-            mostrar_resultados_validacion_formateados(
-                datos_proveedor, 
-                resumen_codigos, 
-                estadisticas_validacion, 
-                validacion_integridad
-            )
 
             # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
             with open(output_comparacion, "rb") as f:
@@ -466,72 +424,12 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             return None
 
 def mostrar_resultados_en_pantalla():
-    """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA"""
+    """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA Y SIMPLIFICADA"""
     
     st.markdown("---")
     st.header("📊 Resultados de la Conciliación")
     
-    # MOSTRAR RESUMEN EN CONSOLA - Comparación DIM vs Subpartidas
-    if st.session_state.reporte_comparacion is not None:
-        st.subheader("📊 EJECUTANDO: Comparación DIM vs Subpartida")
-        st.markdown("============================================================")
-        mostrar_resultados_consola_comparacion_simplificado(
-            st.session_state.reporte_comparacion, 
-            st.session_state.datos_dian, 
-            st.session_state.datos_subpartidas
-        )
-    
-    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA
-    st.subheader("🔍 Comparación DIM vs Subpartidas")
-    
-    if st.session_state.reporte_comparacion is not None:
-        reporte = st.session_state.reporte_comparacion
-        
-        # Mostrar resumen estadístico
-        st.markdown("**Resumen Estadístico:**")
-        
-        di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
-        conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
-        con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total DI procesadas", len(di_individuales))
-        with col2:
-            st.metric("DI conformes", conformes)
-        with col3:
-            st.metric("DI con diferencias", con_diferencias)
-        
-        # Mostrar tabla de resultados con resaltado SOLO para diferencias
-        st.markdown("**Detalle por Declaración:**")
-        
-        # Aplicar estilos para resaltar SOLO filas con diferencias
-        def resaltar_solo_diferencias(row):
-            """Resalta SOLO filas que tienen diferencias (❌)"""
-            if '❌' in str(row['Resultado verificación']):
-                return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
-            else:
-                return [''] * len(row)  # Sin resaltado para conformes
-        
-        # Aplicar el estilo
-        styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
-        
-        # Mostrar la tabla con estilos
-        st.dataframe(styled_reporte, use_container_width=True)
-        
-        # Mostrar totales acumulados
-        fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
-        if not fila_totales.empty:
-            st.markdown("**Totales Acumulados:**")
-            st.dataframe(fila_totales, use_container_width=True)
-            
-            # Resaltar también los totales si hay diferencias
-            if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
-                st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
-    else:
-        st.error("No se pudo generar el reporte de comparación")
-
-    # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO
+    # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO (PRIMERO)
     st.subheader("📋 RESULTADOS DE VALIDACIÓN - FORMATO ESPECÍFICO")
     st.markdown("============================================================")
     
@@ -548,63 +446,58 @@ def mostrar_resultados_en_pantalla():
     else:
         st.error("No se pudieron cargar los datos de validación")
 
-    # Resultados de Validación de Anexos - TABLA DETALLADA
-    st.subheader("📋 Validación de Anexos y Proveedores - Detalle")
-    
-    if st.session_state.reporte_anexos is not None:
-        reporte_anexos = st.session_state.reporte_anexos
-        
-        if reporte_anexos is not None and not reporte_anexos.empty:
-            # Mostrar resumen de validación
-            st.markdown("**Resumen de Validación:**")
+    # RESULTADO COMPARACIÓN DIM vs SUBPARTIDAS - SOLO RESUMEN
+    st.markdown("---")
+    if st.session_state.reporte_comparacion is not None:
+        mostrar_resumen_comparacion_simplificado(
+            st.session_state.reporte_comparacion, 
+            st.session_state.datos_dian, 
+            st.session_state.datos_subpartidas
+        )
+
+    # Resultados de Validación de Anexos - TABLA DETALLADA (OPCIONAL)
+    with st.expander("📋 Ver Detalle de Validación de Anexos"):
+        if st.session_state.reporte_anexos is not None:
+            reporte_anexos = st.session_state.reporte_anexos
             
-            total_campos = len(reporte_anexos)
-            coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '✅ COINCIDE'])
-            no_coincidencias = len(reporte_anexos[reporte_anexos['Coincidencias'] == '❌ NO COINCIDE'])
+            if reporte_anexos is not None and not reporte_anexos.empty:
+                # Mostrar tabla de validación con resaltado SOLO para diferencias
+                st.markdown("**Detalle de Validación:**")
+                
+                def resaltar_solo_validacion_anexos(row):
+                    """Resalta SOLO filas que no coinciden en la validación de anexos"""
+                    if row['Coincidencias'] == '❌ NO COINCIDE':
+                        return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
+                    else:
+                        return [''] * len(row)  # Sin resaltado para coincidencias
+                
+                # Aplicar el estilo
+                styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
+                
+                st.dataframe(styled_anexos, use_container_width=True)
+
+    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA (OPCIONAL)
+    with st.expander("🔍 Ver Detalle de Comparación DIM vs Subpartidas"):
+        if st.session_state.reporte_comparacion is not None:
+            reporte = st.session_state.reporte_comparacion
             
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total campos validados", total_campos)
-            with col2:
-                st.metric("Campos correctos", coincidencias)
-            with col3:
-                st.metric("Campos con diferencias", no_coincidencias)
+            # Mostrar tabla de resultados con resaltado SOLO para diferencias
+            st.markdown("**Detalle por Declaración:**")
             
-            # Mostrar tabla de validación con resaltado SOLO para diferencias
-            st.markdown("**Detalle de Validación:**")
+            di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
             
-            def resaltar_solo_validacion_anexos(row):
-                """Resalta SOLO filas que no coinciden en la validación de anexos"""
-                if row['Coincidencias'] == '❌ NO COINCIDE':
+            def resaltar_solo_diferencias(row):
+                """Resalta SOLO filas que tienen diferencias (❌)"""
+                if '❌' in str(row['Resultado verificación']):
                     return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
                 else:
-                    return [''] * len(row)  # Sin resaltado para coincidencias
+                    return [''] * len(row)  # Sin resaltado para conformes
             
             # Aplicar el estilo
-            styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
+            styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
             
-            st.dataframe(styled_anexos, use_container_width=True)
-            
-            # Mostrar resumen por DI para anexos - SOLO mostrar las que requieren atención
-            st.markdown("**Declaraciones que Requieren Atención:**")
-            di_unicos = reporte_anexos['Numero DI'].unique()
-            di_con_problemas = []
-            
-            for di in di_unicos:
-                datos_di = reporte_anexos[reporte_anexos['Numero DI'] == di]
-                incorrectos = len(datos_di[datos_di['Coincidencias'] == '❌ NO COINCIDE'])
-                
-                if incorrectos > 0:
-                    di_con_problemas.append(di)
-                    st.error(f"DI {di}: {incorrectos} campo(s) con diferencias - **REQUIERE ATENCIÓN**")
-            
-            if not di_con_problemas:
-                st.success("✅ Todas las declaraciones están conformes")
-                    
-        else:
-            st.info("No hay datos de validación de anexos para mostrar")
-    else:
-        st.error("No se pudo generar el reporte de validación de anexos")
+            # Mostrar la tabla con estilos
+            st.dataframe(styled_reporte, use_container_width=True)
 
 def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
@@ -794,4 +687,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-     
