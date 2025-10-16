@@ -79,10 +79,10 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     st.markdown("### 👤 Información del Proveedor")
     nit = datos_proveedor.get('nit', 'No disponible')
     nombre = datos_proveedor.get('nombre', 'No disponible')
-    st.markdown(f"✅**NIT:** {nit} **Nombre:** {nombre}]")
+    st.markdown(f"• **NIT:** {nit} • **Nombre:** {nombre}")
     
     # Resumen por código
-    st.markdown("### 📊 Resumen por código:")
+    st.markdown("### 📝 Resumen por código:")
     if resumen_codigos:
         for codigo, info in resumen_codigos.items():
             cantidad = info.get('cantidad', 0)
@@ -137,7 +137,7 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
         st.markdown(f"   📝 Faltan por procesar: {di_faltantes} declaraciones de DI")
     
     # RESUMEN EJECUTIVO
-    st.markdown("### 🎯 RESUMEN EJECUTIVO")
+    st.markdown("### 📝 RESUMEN EJECUTIVO")
     
     declaraciones_correctas = estadisticas_validacion.get('declaraciones_correctas', 0)
     eficiencia = (total_di_procesadas / total_di_anexos * 100) if total_di_anexos > 0 else 0
@@ -560,11 +560,11 @@ def main():
     inicializar_estados()
     
     # Header principal
-    st.title("🚢 Aplicación de Verificación DIM vs FMM")
+    st.title("🚛 Aplicación de Verificación DIM vs FMM")
     
     # Instrucciones en sidebar
     with st.sidebar:
-        st.header("Instrucciones de uso")
+        st.header("🧭 Instrucciones de uso")
         st.markdown("""
         1. **Cargar Declaraciones PDF** (DIAN)
         2. **Cargar Excel de Subpartidas**
@@ -698,6 +698,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
