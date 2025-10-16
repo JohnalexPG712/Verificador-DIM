@@ -574,11 +574,11 @@ def main():
     with st.sidebar:
         st.header("🧭 Instrucciones de uso")
         st.markdown("""
-        1. **Cargar Declaraciones PDF** (DIM)
-        2. **Cargar Excel Subpartidas FMM**
-        3. **Cargar Excel Anexos FMM** 
-        4. **Ejecutar Verificación**
-        5. **Ver resultados en pantalla y descargar**
+        1. Cargar Declaraciones PDF (DIM)
+        2. Cargar Excel Subpartidas FMM
+        3. Cargar Excel Anexos FMM
+        4. Ejecutar Verificación
+        5. Ver resultados en pantalla y descargar
         """)
         
         # Botón de limpieza
@@ -706,6 +706,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
