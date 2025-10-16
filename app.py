@@ -433,10 +433,6 @@ def mostrar_resultados_en_pantalla():
     if (st.session_state.datos_proveedor is not None and 
         st.session_state.resumen_codigos is not None and 
         st.session_state.estadisticas_validacion is not None):
-    
-    if (st.session_state.datos_proveedor is not None and 
-        st.session_state.resumen_codigos is not None and 
-        st.session_state.estadisticas_validacion is not None):
         
         mostrar_resultados_validacion_formateados(
             st.session_state.datos_proveedor,
@@ -698,6 +694,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
