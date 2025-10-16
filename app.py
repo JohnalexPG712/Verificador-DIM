@@ -426,12 +426,13 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
 def mostrar_resultados_en_pantalla():
     """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA Y SIMPLIFICADA"""
     
-    st.markdown("---")
+   st.markdown("---")
     st.header("📊 Resultados de la Conciliación")
     
     # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO (PRIMERO)
-    st.subheader("📋 RESULTADOS DE VALIDACIÓN - FORMATO ESPECÍFICO")
-    st.markdown("============================================================")
+    if (st.session_state.datos_proveedor is not None and 
+        st.session_state.resumen_codigos is not None and 
+        st.session_state.estadisticas_validacion is not None):
     
     if (st.session_state.datos_proveedor is not None and 
         st.session_state.resumen_codigos is not None and 
@@ -697,4 +698,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
