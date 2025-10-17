@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Aplicación de Verificación DIM vs FMM",
+    page_title="SmartDIM",
     page_icon="🚀",
     layout="wide"
 )
@@ -706,6 +706,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
