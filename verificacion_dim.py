@@ -1202,7 +1202,7 @@ class ValidadorDeclaracionImportacionCompleto:
                     
                     try:
                         codigo_str = str(codigo).strip().split('.')[0]
-                        if codigo_str not in ['6', '9', '17', '47', '93']:
+                        if codigo_str not in ['6', '9', '17', '47', '93', '91']:
                             fila_actual += 1
                             continue
                     except:
