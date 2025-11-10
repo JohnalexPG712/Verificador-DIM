@@ -299,7 +299,7 @@ class ExtractorDIANSimplificado:
             return None
 
 # =============================================================================
-# CLASE 2: COMPARACIÓN DE DATOS - LÓGICA CORREGIDA (SEGUNDO SCRIPT)
+# CLASE 2: COMPARACIÓN DE DATOS - LÓGICA MEJORADA
 # =============================================================================
 
 class ComparadorDatos:
@@ -352,6 +352,56 @@ class ComparadorDatos:
                 mascara_valida = mascara_valida & mascara_campo
         
         return datos_dian[mascara_valida]
+    
+    def obtener_suma_subpartidas(self, datos_subpartidas):
+        """
+        Calcula la suma total de todos los campos acumulables de las subpartidas
+        """
+        if datos_subpartidas is None or datos_subpartidas.empty:
+            return {}
+        
+        suma_subpartidas = {}
+        
+        # Campos acumulables a sumar
+        campos_acumulables = {
+            'peso_bruto': 'PESO BRUTO',
+            'peso_neto': 'PESO NETO', 
+            'cantidad': 'CANTIDAD',
+            'valor_fob': 'VALOR FOB',
+            'valor_fletes': 'VALOR FLETES',
+            'valor_seguro': 'VALOR SEGURO',
+            'otros_gastos': 'OTROS GASTOS'
+        }
+        
+        for campo, nombre_columna in campos_acumulables.items():
+            if campo in datos_subpartidas.columns:
+                # Sumar todos los valores válidos de todas las subpartidas
+                valores_validos = datos_subpartidas[campo].apply(self.es_valor_valido)
+                suma = datos_subpartidas[valores_validos][campo].sum()
+                suma_subpartidas[campo] = suma
+            else:
+                suma_subpartidas[campo] = 0
+        
+        return suma_subpartidas
+
+    def determinar_estrategia_comparacion(self, datos_subpartidas):
+        """
+        Determina si hay una o múltiples subpartidas y ajusta la estrategia de comparación
+        """
+        if datos_subpartidas is None or datos_subpartidas.empty:
+            return "sin_datos"
+        
+        num_subpartidas = len(datos_subpartidas)
+        
+        print(f"📊 ESTRATEGIA DE COMPARACIÓN:")
+        print(f"   • Subpartidas encontradas: {num_subpartidas}")
+        
+        if num_subpartidas == 1:
+            print("   • Estrategia: COMPARACIÓN INDIVIDUAL (1 subpartida)")
+            return "individual"
+        else:
+            print(f"   • Estrategia: COMPARACIÓN ACUMULADA ({num_subpartidas} subpartidas)")
+            return "acumulada"
     
     def formatear_numero_entero(self, valor, campo_nombre=""):
         """
@@ -491,10 +541,14 @@ class ComparadorDatos:
             else:
                 return f"✅ {valor_actual_formateado}"
 
-    def determinar_resultado_final(self, fila_dian, fila_subpartida):
+    def determinar_resultado_final(self, fila_dian, fila_subpartida, estrategia="individual"):
         """
-        Determina el resultado final basado en comparaciones reales - LÓGICA CORREGIDA
+        Determina el resultado final basado en comparaciones reales - LÓGICA MEJORADA
         """
+        # Si hay múltiples subpartidas, no hacemos comparación individual
+        if estrategia != "individual":
+            return False  # La validación se hace a nivel de totales
+        
         errores_criticos = False
         
         numero_di = fila_dian.get("4. Número DI", "Desconocido")
@@ -536,9 +590,19 @@ class ComparadorDatos:
         
         return errores_criticos
 
+    def _evaluar_tolerancia(self, campo_dian, diferencia_absoluta, diferencia_porcentual):
+        """Evalúa si la diferencia está dentro de las tolerancias permitidas"""
+        
+        if campo_dian == "78. Valor FOB USD":
+            return diferencia_absoluta < 1.0 or diferencia_porcentual < 0.5
+        elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]:
+            return diferencia_absoluta < 0.10 or diferencia_porcentual < 1.0
+        else:
+            return diferencia_absoluta < 0.1 or diferencia_porcentual < 0.1
+
     def generar_reporte_tabular(self, datos_dian, datos_subpartidas):
         """
-        Genera reporte con nombres actualizados para Excel (DI en lugar de DIM)
+        Genera reporte con lógica adaptada para 1 o múltiples subpartidas
         """
         if datos_dian is None or datos_dian.empty:
             return pd.DataFrame()
@@ -546,43 +610,70 @@ class ComparadorDatos:
         if datos_subpartidas is None or datos_subpartidas.empty:
             return pd.DataFrame()
         
-        fila_subpartida = datos_subpartidas.iloc[0]
+        # Determinar estrategia de comparación
+        estrategia = self.determinar_estrategia_comparacion(datos_subpartidas)
+        
+        # Obtener suma total de subpartidas según la estrategia
+        if estrategia == "individual":
+            # Caso 1: Una sola subpartida - usar sus valores directamente
+            fila_subpartida = datos_subpartidas.iloc[0]
+            suma_subpartidas = None  # No necesitamos suma, usamos valores individuales
+            print("   • Usando valores de la única subpartida para comparación")
+        else:
+            # Caso 2: Múltiples subpartidas - calcular suma total
+            suma_subpartidas = self.obtener_suma_subpartidas(datos_subpartidas)
+            # Crear una fila "virtual" con las sumas para mantener compatibilidad
+            fila_subpartida = pd.Series(suma_subpartidas)
+            print("   • Usando suma total de todas las subpartidas para comparación")
+        
         reporte_filas = []
         
         for _, fila_dian in datos_dian.iterrows():
             numero_di = fila_dian.get("4. Número DI", "Desconocido")
             fila_reporte = {"4. Número DI": numero_di}
             
-            # 1. Campos de consistencia - CON EMOJIS (se mantienen igual)
+            # 1. Campos de consistencia (se mantienen igual)
             for campo_consistencia, campo_dian in self.campos_consistencia.items():
                 valor_formateado = self.verificar_consistencia_campo(datos_dian, campo_dian, numero_di)
                 fila_reporte[campo_dian] = valor_formateado
             
-            # 2. Campos de comparación individual - CON NOMBRES ACTUALIZADOS A "DI"
+            # 2. Campos de comparación individual 
             for campo, (campo_dian, _) in self.campos_comparacion_individual.items():
                 valor_dian = fila_dian.get(campo_dian, "NO ENCONTRADO")
-                valor_subpartida = fila_subpartida.get(campo, "NO ENCONTRADO")
                 
-                # Comparar con lógica corregida
-                valor_formateado, es_correcto = self.comparar_valor_individual_critico(valor_dian, valor_subpartida, campo_dian)
+                if estrategia == "individual":
+                    # Usar valor individual de la subpartida
+                    valor_subpartida = fila_subpartida.get(campo, "NO ENCONTRADO")
+                else:
+                    # Para múltiples subpartidas, estos campos no se comparan individualmente
+                    valor_subpartida = "N/A PARA MÚLTIPLES SUBPARTIDAS"
                 
-                # NOMBRES ACTUALIZADOS PARA EXCEL - "DI" en lugar de "DIM"
+                valor_formateado, es_correcto = self.comparar_valor_individual_critico(
+                    valor_dian, valor_subpartida, campo_dian
+                )
+                
                 nombre_campo_di = f"{campo_dian} DI"
                 nombre_campo_subpartida = f"{campo_dian} Subpartida"
                 
                 fila_reporte[nombre_campo_di] = valor_formateado
-                fila_reporte[nombre_campo_subpartida] = self.formatear_numero_entero(valor_subpartida, f"{campo_dian} Subpartida")
+                fila_reporte[nombre_campo_subpartida] = self.formatear_numero_entero(
+                    valor_subpartida, f"{campo_dian} Subpartida"
+                )
             
-            # 3. Campos acumulables - CON NOMBRES ACTUALIZADOS A "DI"
+            # 3. Campos acumulables - la lógica cambia según la estrategia
             for campo, (campo_dian, _) in self.campos_acumulables.items():
                 valor_dian = fila_dian.get(campo_dian, "NO ENCONTRADO")
-                valor_subpartida = fila_subpartida.get(campo, "NO ENCONTRADO")
                 
-                # NOMBRES ACTUALIZADOS PARA EXCEL - "DI" en lugar de "DIM"
+                if estrategia == "individual":
+                    valor_subpartida = fila_subpartida.get(campo, "NO ENCONTRADO")
+                else:
+                    # Para múltiples subpartidas, usamos la suma precalculada
+                    valor_subpartida = suma_subpartidas.get(campo, 0) if suma_subpartidas else 0
+                
                 nombre_campo_di = f"{campo_dian} DI"
                 nombre_campo_subpartida = f"{campo_dian} Subpartida"
                 
-                # Guardar valores numéricos puros
+                # Guardar valores numéricos puros (sin emojis todavía)
                 if self.es_valor_valido(valor_dian):
                     fila_reporte[nombre_campo_di] = valor_dian
                 else:
@@ -594,32 +685,27 @@ class ComparadorDatos:
                     fila_reporte[nombre_campo_subpartida] = None
             
             # Determinar resultado FINAL
-            tiene_errores = self.determinar_resultado_final(fila_dian, fila_subpartida)
+            tiene_errores = self.determinar_resultado_final(fila_dian, fila_subpartida, estrategia)
             fila_reporte["Resultado verificación"] = "❌ CON DIFERENCIAS" if tiene_errores else "✅ CONFORME"
             
             reporte_filas.append(fila_reporte)
-            
-            # SOLO MOSTRAR SI HAY DIFERENCIAS
-            if tiene_errores:
-                print(f"🔍 DI: {numero_di} - ❌ CON DIFERENCIAS")
         
-        # Agregar totales con nombres actualizados a "DI"
-        self._agregar_totales_acumulados_con_nombres_di(reporte_filas, datos_dian, fila_subpartida)
+        # Agregar totales con la nueva lógica
+        self._agregar_totales_acumulados_mejorado(
+            reporte_filas, datos_dian, fila_subpartida, suma_subpartidas, estrategia
+        )
         
-        # Crear DataFrame
+        # Crear DataFrame y ordenar columnas
         df_reporte = pd.DataFrame(reporte_filas)
-        
-        # Ordenar columnas con nombres actualizados a "DI"
         columnas_ordenadas = self._ordenar_columnas_reporte_con_di(df_reporte)
         df_reporte = df_reporte[columnas_ordenadas]
         
         return df_reporte
 
-    def _agregar_totales_acumulados_con_nombres_di(self, reporte_filas, datos_dian, fila_subpartida):
-        """Agrega fila de totales con nombres actualizados a "DI" """
-        # Filtrar filas válidas para totales
-        datos_dian_validos = self.obtener_filas_validas_para_totales(datos_dian)
+    def _agregar_totales_acumulados_mejorado(self, reporte_filas, datos_dian, fila_subpartida, suma_subpartidas, estrategia):
+        """Agrega fila de totales con lógica adaptada para 1 o múltiples subpartidas"""
         
+        datos_dian_validos = self.obtener_filas_validas_para_totales(datos_dian)
         fila_totales = {"4. Número DI": "VALORES ACUMULADOS"}
         tiene_errores_totales = False
         
@@ -635,64 +721,60 @@ class ComparadorDatos:
             fila_totales[nombre_campo_di] = "N/A"
             fila_totales[nombre_campo_subpartida] = "N/A"
         
-        # Campos acumulables - CALCULAR TOTALES CON NOMBRES ACTUALIZADOS A "DI"
+        # Campos acumulables - CALCULAR TOTALES CON NUEVA LÓGICA
         for campo, (campo_dian, _) in self.campos_acumulables.items():
             nombre_campo_di = f"{campo_dian} DI"
             nombre_campo_subpartida = f"{campo_dian} Subpartida"
             
             if campo_dian in datos_dian_validos.columns and len(datos_dian_validos) > 0:
                 total_dian = datos_dian_validos[campo_dian].sum()
-                valor_subpartida = fila_subpartida.get(campo, 0)
                 
-                # Para cantidad, solo mostrar valores sin validación
-                if campo == 'cantidad':
-                    fila_totales[nombre_campo_di] = total_dian
-                    fila_totales[nombre_campo_subpartida] = valor_subpartida
+                # Obtener valor de subpartida según la estrategia
+                if estrategia == "individual":
+                    valor_subpartida = fila_subpartida.get(campo, 0)
                 else:
-                    # Para otros campos acumulables, agregar emojis de validación
-                    try:
-                        if self.es_valor_valido(valor_subpartida) and total_dian != 0:
-                            diferencia_absoluta = abs(float(total_dian) - float(valor_subpartida))
+                    valor_subpartida = suma_subpartidas.get(campo, 0) if suma_subpartidas else 0
+                
+                # Aplicar validación con emojis
+                try:
+                    if self.es_valor_valido(valor_subpartida) and total_dian != 0:
+                        diferencia_absoluta = abs(float(total_dian) - float(valor_subpartida))
+                        
+                        # Solo calcular porcentaje si valor_subpartida no es cero
+                        if float(valor_subpartida) != 0:
                             diferencia_porcentual = (diferencia_absoluta / float(valor_subpartida)) * 100
-                            
-                            # Aplicar tolerancias y agregar emojis
-                            if campo_dian == "78. Valor FOB USD":
-                                if diferencia_absoluta < 1.0 or diferencia_porcentual < 0.5:
-                                    fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"✅ {valor_subpartida:.2f}"
-                                else:
-                                    fila_totales[nombre_campo_di] = f"❌ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"❌ {valor_subpartida:.2f}"
-                                    tiene_errores_totales = True
-                            elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]:
-                                if diferencia_absoluta < 0.10 or diferencia_porcentual < 1.0:
-                                    fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"✅ {valor_subpartida:.2f}"
-                                else:
-                                    fila_totales[nombre_campo_di] = f"❌ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"❌ {valor_subpartida:.2f}"
-                                    tiene_errores_totales = True
-                            else:
-                                if diferencia_absoluta < 0.1 or diferencia_porcentual < 0.1:
-                                    fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"✅ {valor_subpartida:.2f}"
-                                else:
-                                    fila_totales[nombre_campo_di] = f"❌ {total_dian:.2f}"
-                                    fila_totales[nombre_campo_subpartida] = f"❌ {valor_subpartida:.2f}"
-                                    tiene_errores_totales = True
                         else:
-                            # Si no hay valor de subpartida, mostrar sin emojis
-                            fila_totales[nombre_campo_di] = f"{total_dian:.2f}"
-                            fila_totales[nombre_campo_subpartida] = f"{valor_subpartida:.2f}"
-                    except:
-                        # En caso de error, mostrar sin emojis
+                            diferencia_porcentual = 100  # Si es cero, considerar 100% de diferencia
+                        
+                        # Aplicar tolerancias
+                        es_correcto = self._evaluar_tolerancia(campo_dian, diferencia_absoluta, diferencia_porcentual)
+                        
+                        if es_correcto:
+                            fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
+                            fila_totales[nombre_campo_subpartida] = f"✅ {valor_subpartida:.2f}"
+                        else:
+                            fila_totales[nombre_campo_di] = f"❌ {total_dian:.2f}"
+                            fila_totales[nombre_campo_subpartida] = f"❌ {valor_subpartida:.2f}"
+                            tiene_errores_totales = True
+                    else:
+                        # Si no hay valor de subpartida, mostrar sin emojis
                         fila_totales[nombre_campo_di] = f"{total_dian:.2f}"
                         fila_totales[nombre_campo_subpartida] = f"{valor_subpartida:.2f}"
+                except:
+                    # En caso de error, mostrar sin emojis
+                    fila_totales[nombre_campo_di] = f"{total_dian:.2f}"
+                    fila_totales[nombre_campo_subpartida] = f"{valor_subpartida:.2f}"
             else:
                 fila_totales[nombre_campo_di] = "N/A"
                 fila_totales[nombre_campo_subpartida] = "N/A"
         
-        fila_totales["Resultado verificación"] = "❌ TOTALES NO COINCIDEN" if tiene_errores_totales else "✅ TOTALES CONFORME"
+        # Mensaje final según estrategia
+        if estrategia == "individual":
+            mensaje_resultado = "❌ TOTALES NO COINCIDEN" if tiene_errores_totales else "✅ TOTALES CONFORME"
+        else:
+            mensaje_resultado = "❌ TOTALES ACUMULADOS NO COINCIDEN" if tiene_errores_totales else "✅ TOTALES ACUMULADOS CONFORME"
+        
+        fila_totales["Resultado verificación"] = mensaje_resultado
         reporte_filas.append(fila_totales)
 
     def _ordenar_columnas_reporte_con_di(self, df_reporte):
@@ -966,13 +1048,13 @@ class ValidadorDeclaracionImportacionCompleto:
                 "cambia_por_declaracion": False
             },
             "44. No. Documento de Transporte": {
-                "codigo_formulario": [17, 91],
+                "codigo_formulario": [17, 91],  # Ambos códigos son válidos
                 "descripcion_esperada": "DOCUMENTO OF TRANSPORTE",
                 "tipo": "documento",
                 "cambia_por_declaracion": False
             },
             "45. Fecha Documento de Transporte": {
-                "codigo_formulario": [17, 91],
+                "codigo_formulario": [17, 91],  # Ambos códigos son válidos
                 "descripcion_esperada": "DOCUMENTO OF TRANSPORTE",
                 "tipo": "fecha",
                 "cambia_por_declaracion": False
@@ -1202,7 +1284,8 @@ class ValidadorDeclaracionImportacionCompleto:
                     
                     try:
                         codigo_str = str(codigo).strip().split('.')[0]
-                        if codigo_str not in ['6', '9', '17', '47', '93', '91']:
+                        # INCLUIR CÓDIGO 91 Y PERMITIR CÓDIGOS 17 Y 91 COMO VÁLIDOS
+                        if codigo_str not in ['6', '9', '17', '47', '93', '91']:  # Agregar '91' a la lista
                             fila_actual += 1
                             continue
                     except:
@@ -1582,7 +1665,8 @@ class ValidadorDeclaracionImportacionCompleto:
                 else:
                     anexos_correspondientes = anexos_formulario[
                         anexos_formulario['Codigo'].isin(
-                            [codigo_esperado] if not isinstance(codigo_esperado, list) else codigo_esperado)
+                            [codigo_esperado] if not isinstance(codigo_esperado, list) else codigo_esperado
+                        )
                     ]
                     
                     if anexos_correspondientes.empty:
@@ -1838,3 +1922,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+[file content end]
