@@ -966,13 +966,13 @@ class ValidadorDeclaracionImportacionCompleto:
                 "cambia_por_declaracion": False
             },
             "44. No. Documento de Transporte": {
-                "codigo_formulario": 17,
+                "codigo_formulario": [17, 91],
                 "descripcion_esperada": "DOCUMENTO OF TRANSPORTE",
                 "tipo": "documento",
                 "cambia_por_declaracion": False
             },
             "45. Fecha Documento de Transporte": {
-                "codigo_formulario": 17,
+                "codigo_formulario": [17, 91],
                 "descripcion_esperada": "DOCUMENTO OF TRANSPORTE",
                 "tipo": "fecha",
                 "cambia_por_declaracion": False
