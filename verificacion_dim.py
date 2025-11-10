@@ -1581,7 +1581,8 @@ class ValidadorDeclaracionImportacionCompleto:
                 
                 else:
                     anexos_correspondientes = anexos_formulario[
-                        anexos_formulario['Codigo'] == codigo_esperado
+                        anexos_formulario['Codigo'].isin(
+                            [codigo_esperado] if not isinstance(codigo_esperado, list) else codigo_esperado)
                     ]
                     
                     if anexos_correspondientes.empty:
