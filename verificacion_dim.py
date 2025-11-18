@@ -1021,8 +1021,8 @@ class ValidadorDeclaracionImportacionCompleto:
                 r"5\.\s*Número de Identificación Tributaria \(NIT\)[\s\S]*?(\d{6,12})"
             ],
             "11. Apellidos y Nombres / Razón Social Importador": [
-                r"11\s*\.?\s*Apellidos\s*y\s*nombres\s*o\s*Raz[oó]n\s*Social\s*\n?\s*\d{6,12}\s*\d?\s*([A-ZÁÉÍÓÚÑ0-9\s\.\-]+?)(?=\s*13\s*\.)",
-                r"11\.\s*Apellidos y nombres o Razón Social[\s\S]*?\n\s*(\d{6,12}\s*\d?\s*[A-ZÁÉÍÓÚÑ0-9\s\.\-]+)"
+                r"11\s*\.?\s*Apellidos\s*y\s*nombres\s*o\s*Raz[oó]n\s*Social\s*\n?\s*\d{6,12}\s*\d?\s*([A-ZÁÉÍÓÚÑ0-9\s\.\-&/]+?)(?=\s*13\s*\.)",
+                r"11\.\s*Apellidos y nombres o Razón Social[\s\S]*?\n\s*(\d{6,12}\s*\d?\s*[A-ZÁÉÍÓÚÑ0-9\s\.\-&/]+)"
             ],
             "42. No. Manifiesto de Carga": [
                 r"42\s*\.?\s*Manifiesto\s*de\s*carga[\s\S]*?No\.?\s*([A-Z0-9]+)"
@@ -1031,7 +1031,7 @@ class ValidadorDeclaracionImportacionCompleto:
                 r"43\s*\.?\s*Año\s*[-\s]*Mes\s*[-\s]*Día.*?(\d{4}\s*[-]\s*\d{2}\s*[-]\s*\d{2})"
             ],
             "44. No. Documento de Transporte": [
-                r"44\s*\.?\s*Documento\s*de\s*transporte[\s\S]*?(?:No\.?\s*)?((?:[A-Z]+[0-9]+(?:\-[0-9]+)?)|(?:[0-9]{8,15}))(?=\s|[0-9]{4}|$)"
+                r"44\s*\.?\s*Documento\s*de\s*transporte[\s\S]*?(?:No\.?\s*)?((?:[A-Z]+[0-9]+(?:\-[A-Z0-9]+)?)|(?:[0-9]{10,11}))(?=\s|[0-9]{4}|$)"
             ],
             "45. Fecha Documento de Transporte": [
                 r"45\s*\.?\s*Año.*?Día[\s\S]*?[0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2}[\s\S]*?([0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2})"
@@ -1744,7 +1744,7 @@ def main():
     """Función principal que ejecuta ambos scripts integrados"""
     
     # Configuración de rutas
-    CARPETA_BASE = r"E:\Users\Lenovo\Desktop\PYTHON\DI\Junior fmm 847156"
+    CARPETA_BASE = r"E:\Users\Lenovo\Desktop\PYTHON\DI\Junior Deposito 401\SLIND 401\SLIND 401\SLI 850232"
     
     # Archivos de salida
     EXCEL_OUTPUT_COMPARACION = os.path.join(CARPETA_BASE, "Resultado Validación Subpartida vs DIM.xlsx")
