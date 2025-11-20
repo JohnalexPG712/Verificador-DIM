@@ -1037,7 +1037,7 @@ class ValidadorDeclaracionImportacionCompleto:
                 r"45\s*\.?\s*Año.*?Día[\s\S]*?[0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2}[\s\S]*?([0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2})"
             ],
             "51. No. Factura Comercial": [
-                r"51\s*\.?\s*No\.?\s*de\s*factura[\s\S]*?\n\s*([A-Z0-9\-]+(?:\s*/\s*[A-Z0-9]+)?)"
+                r"51\s*\.?\s*No\.?\s*de\s*factura[\s\S]*?\n\s*([A-Z0-9\-]+(?:\s+[A-Z0-9\-]+)*(?:\s*/\s*[A-Z0-9]+)?)"
             ],
             "52. Fecha Factura Comercial": [
                 r"52\s*\.\s*?Año\s*-\s*Mes\s*-\s*Día.*?\n(?:.*?[^\d\w-])?(\d{4}\s*-\s*\d{2}\s*-\s*\d{2})"
