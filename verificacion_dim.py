@@ -1031,7 +1031,8 @@ class ValidadorDeclaracionImportacionCompleto:
                 r"43\s*\.?\s*Año\s*[-\s]*Mes\s*[-\s]*Día.*?(\d{4}\s*[-]\s*\d{2}\s*[-]\s*\d{2})"
             ],
             "44. No. Documento de Transporte": [
-                r"44\s*\.?\s*Documento\s*de\s*transporte[\s\S]*?(?:No\.?\s*)?((?:[A-Z]*[0-9]+(?:\-[A-Z0-9]+)?)|(?:[0-9]{6,11}))(?=\s|[0-9]{4}|$)"
+                r"44\s*\.?\s*Documento\s*de\s*transporte[\s\S]*?(?:No\.?\s*)?((?:[A-Z]+[0-9]+(?:\-[A-Z0-9]+)?)|(?:[0-9]{10,11}))(?=\s|[0-9]{4}|$)",
+                r"44\s*\.?\s*Documento\s*de\s*transporte[\s\S]*?(?:No\.?\s*)?([A-Za-z]*[0-9]{6,}(?:-[A-Za-z0-9]+)?)"
             ],
             "45. Fecha Documento de Transporte": [
                 r"45\s*\.?\s*Año.*?Día[\s\S]*?[0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2}[\s\S]*?([0-9]{4}\s*-\s*[0-9]{2}\s*-\s*[0-9]{2})"
