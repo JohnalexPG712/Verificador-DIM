@@ -580,10 +580,9 @@ class ComparadorDatos:
         
         # Para Modalidad, verificar que sea C200
         if campo_dian == "62. Cod. Modalidad":
-            if str(valor_actual).strip().upper() == "C200":
-                return f"✅ {valor_actual_formateado}"
-            else:
-                return f"❌ {valor_actual_formateado}"
+            return valor_actual_formateado
+            
+        return valor_actual_formateado       
         
         # Verificar si este valor es consistente con los demás (para otros campos)
         valores_unicos = datos_dian[campo_dian].apply(self.es_valor_valido)
