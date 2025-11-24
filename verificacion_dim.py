@@ -656,13 +656,11 @@ class ComparadorDatos:
                 print(f"   ❌ Error crítico: {campo_dian} ambos valores inválidos")
                 break
         
-        # 2. VERIFICAR MODALIDAD - DEBE SER "C200"
+        # 2. NO VERIFICAR MODALIDAD - YA NO DEBE SER "C200"
         if not errores_criticos:
             modalidad_dian = fila_dian.get("62. Cod. Modalidad", "NO ENCONTRADO")
             if self.es_valor_valido(modalidad_dian):
-                if str(modalidad_dian).strip().upper() != "C200":
-                    errores_criticos = True
-                    print(f"   ❌ Error en Modalidad: debe ser 'C200', pero es '{modalidad_dian}'")
+               pass 
         
         # 3. VERIFICAR SUBPARTIDA ARANCELARIA - SOLO CUANDO HAY MÚLTIPLES SUBPARTIDAS EN EXCEL
         if not errores_criticos and multiples_subpartidas_excel:
