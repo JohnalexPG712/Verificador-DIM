@@ -398,7 +398,7 @@ class ComparadorDatos:
 
     def calcular_totales_subpartidas_excel(self, datos_subpartidas):
         """
-        Calcula los totales de todas las subpartidas en el Excel
+        Calcula los totales de todas las subpartidas en el Excel - MEJORADO
         """
         if datos_subpartidas is None or datos_subpartidas.empty:
             return {}
@@ -417,9 +417,11 @@ class ComparadorDatos:
             else:
                 totales[campo] = 0
         
-        # Campo especial: Número de Bultos (se suma solo en Excel)
+        # Campo especial: Número de Bultos (se suma solo en Excel) - MEJORADO
         if 'numero_bultos' in datos_subpartidas.columns:
             totales['numero_bultos'] = datos_subpartidas['numero_bultos'].sum()
+        else:
+            totales['numero_bultos'] = 0
         
         return totales
 
@@ -606,8 +608,6 @@ class ComparadorDatos:
             else:
                 return f"✅ {valor_actual_formateado}"
 
-    # En la clase ComparadorDatos, modificar el método determinar_resultado_final:
-
     def determinar_resultado_final(self, fila_dian, fila_subpartida, multiples_subpartidas_excel=False):
         """
         Determina el resultado final basado en comparaciones reales - LÓGICA MEJORADA
@@ -690,11 +690,11 @@ class ComparadorDatos:
         
         return errores_criticos
 
-# Y modificar el método generar_reporte_tabular para pasar el parámetro:
+    # En la clase ComparadorDatos, modificar el método generar_reporte_tabular:
 
     def generar_reporte_tabular(self, datos_dian, datos_subpartidas):
         """
-        Genera reporte con soporte para múltiples subpartidas - MEJORADO
+        Genera reporte con soporte para múltiples subpartidas - MEJORADO CON BULTOS INDIVIDUALES
         """
         if datos_dian is None or datos_dian.empty:
             return pd.DataFrame()
@@ -803,6 +803,40 @@ class ComparadorDatos:
                 else:
                     fila_reporte[nombre_campo_subpartida] = None
             
+            # 5. CAMPO ESPECIAL: Número de Bultos - MOSTRAR VALORES INDIVIDUALES POR CADA SUBPARTIDA
+            if multiples_subpartidas:
+                # Para múltiples subpartidas, mostrar bultos individuales
+                nombre_campo_di_bultos = "74. Número de Bultos DI"
+                nombre_campo_subpartida_bultos = "74. Número de Bultos Subpartida"
+                
+                # Valor de bultos de la DI (se repite igual en todas)
+                bultos_di = di.get("74. Número de Bultos", "NO ENCONTRADO")
+                
+                # Valor de bultos de la subpartida específica del Excel
+                if subpartida is not None:
+                    bultos_subpartida = subpartida.get('numero_bultos', "NO ENCONTRADO")
+                else:
+                    bultos_subpartida = "NO ENCONTRADO"
+                
+                # Formatear con emojis para comparación individual
+                if self.es_valor_valido(bultos_di) and self.es_valor_valido(bultos_subpartida):
+                    try:
+                        bultos_di_float = float(bultos_di)
+                        bultos_subpartida_float = float(bultos_subpartida)
+                        
+                        # Para bultos individuales, NO comparamos (solo mostramos)
+                        # La comparación real se hace en los totales
+                        fila_reporte[nombre_campo_di_bultos] = f"{bultos_di_float:.0f}"
+                        fila_reporte[nombre_campo_subpartida_bultos] = f"{bultos_subpartida_float:.0f}"
+                        
+                        print(f"   📦 Bultos individuales - DI: {bultos_di_float:.0f}, Subpartida: {bultos_subpartida_float:.0f}")
+                    except:
+                        fila_reporte[nombre_campo_di_bultos] = str(bultos_di)
+                        fila_reporte[nombre_campo_subpartida_bultos] = str(bultos_subpartida)
+                else:
+                    fila_reporte[nombre_campo_di_bultos] = str(bultos_di)
+                    fila_reporte[nombre_campo_subpartida_bultos] = str(bultos_subpartida)
+            
             # Determinar resultado FINAL con lógica mejorada - pasar el parámetro de múltiples subpartidas
             tiene_errores = self.determinar_resultado_final(di, subpartida if subpartida is not None else {}, multiples_subpartidas)
             fila_reporte["Resultado verificación"] = "❌ CON DIFERENCIAS" if tiene_errores else "✅ CONFORME"
@@ -827,14 +861,24 @@ class ComparadorDatos:
         df_reporte = df_reporte[columnas_ordenadas]
         
         return df_reporte
-
+    
     def _agregar_totales_multiples_subpartidas(self, reporte_filas, datos_dian, datos_subpartidas):
-        """Agrega fila de totales para múltiples subpartidas"""
+        """Agrega fila de totales para múltiples subpartidas - MEJORADO CON BULTOS"""
         # Calcular totales de DI
         totales_di = self.calcular_totales_di(datos_dian)
         
         # Calcular totales de subpartidas en Excel
         totales_subpartidas = self.calcular_totales_subpartidas_excel(datos_subpartidas)
+        
+        # OBTENER EL VALOR DE BULTOS DE LAS DI (primer valor encontrado)
+        bultos_di = None
+        if '74. Número de Bultos' in datos_dian.columns:
+            valores_bultos_di = datos_dian['74. Número de Bultos'].dropna().unique()
+            if len(valores_bultos_di) > 0:
+                bultos_di = valores_bultos_di[0]
+        
+        # CALCULAR SUMA DE BULTOS DEL EXCEL
+        bultos_excel_total = totales_subpartidas.get('numero_bultos', 0)
         
         fila_totales = {"4. Número DI": "VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)"}
         tiene_errores_totales = False
@@ -925,10 +969,42 @@ class ComparadorDatos:
                 fila_totales[nombre_campo_di] = f"{total_di:.2f}"
                 fila_totales[nombre_campo_subpartida] = f"{total_subpartida:.2f}"
         
-        # Campo especial: Número de Bultos (solo en Excel) - CORREGIDO
+        # CAMPO ESPECIAL: Número de Bultos - COMPARACIÓN MEJORADA
         if '74. Número de Bultos' in self.campos_consistencia.values():
-            total_bultos_excel = totales_subpartidas.get('numero_bultos', 0)
-            fila_totales['74. Número de Bultos'] = f"{total_bultos_excel:.0f}"
+            nombre_campo_di = "74. Número de Bultos DI"
+            nombre_campo_subpartida = "74. Número de Bultos Subpartida"
+            
+            # Usar el valor de bultos de las DI (que se repite en todas las subpartidas)
+            if bultos_di is not None:
+                # Comparar con la suma de bultos del Excel
+                if bultos_excel_total != 0:
+                    try:
+                        bultos_di_float = float(bultos_di)
+                        bultos_excel_float = float(bultos_excel_total)
+                        
+                        diferencia_absoluta = abs(bultos_di_float - bultos_excel_float)
+                        diferencia_porcentual = (diferencia_absoluta / bultos_excel_float) * 100
+                        
+                        # Aplicar tolerancia para bultos
+                        if diferencia_absoluta < 1.0 or diferencia_porcentual < 0.1:
+                            fila_totales[nombre_campo_di] = f"✅ {bultos_di_float:.0f}"
+                            fila_totales[nombre_campo_subpartida] = f"✅ {bultos_excel_float:.0f}"
+                        else:
+                            fila_totales[nombre_campo_di] = f"❌ {bultos_di_float:.0f}"
+                            fila_totales[nombre_campo_subpartida] = f"❌ {bultos_excel_float:.0f}"
+                            tiene_errores_totales = True
+                    except:
+                        fila_totales[nombre_campo_di] = f"{bultos_di}"
+                        fila_totales[nombre_campo_subpartida] = f"{bultos_excel_total:.0f}"
+                else:
+                    fila_totales[nombre_campo_di] = f"{bultos_di}"
+                    fila_totales[nombre_campo_subpartida] = f"{bultos_excel_total:.0f}"
+            else:
+                fila_totales[nombre_campo_di] = "N/A"
+                fila_totales[nombre_campo_subpartida] = f"{bultos_excel_total:.0f}"
+            
+            # Mostrar también en el campo de consistencia original
+            fila_totales['74. Número de Bultos'] = f"{bultos_excel_total:.0f}" if bultos_di is not None else "N/A"
         
         fila_totales["Resultado verificación"] = "❌ TOTALES NO COINCIDEN" if tiene_errores_totales else "✅ TOTALES CONFORME"
         reporte_filas.append(fila_totales)
@@ -1015,7 +1091,7 @@ class ComparadorDatos:
 
     def _ordenar_columnas_reporte_con_di(self, df_reporte):
         """
-        Ordena las columnas del reporte con nombres actualizados a "DI"
+        Ordena las columnas del reporte con nombres actualizados a "DI" - MEJORADO
         """
         columnas_base = ['4. Número DI']
         
@@ -1061,11 +1137,20 @@ class ComparadorDatos:
                     nombre_campo_subpartida
                 ])
         
+        # Campo especial: Bultos individuales (si existe en el reporte)
+        columnas_bultos = []
+        if "74. Número de Bultos DI" in df_reporte.columns:
+            columnas_bultos.extend([
+                "74. Número de Bultos DI",
+                "74. Número de Bultos Subpartida"
+            ])
+        
         # Resultado final
         columnas_finales = ['Resultado verificación']
         
         # Combinar todas las columnas
-        todas_columnas = columnas_base + columnas_consistencia + columnas_individuales + columnas_subpartida + columnas_acumulables + columnas_finales
+        todas_columnas = (columnas_base + columnas_consistencia + columnas_individuales + 
+                        columnas_subpartida + columnas_acumulables + columnas_bultos + columnas_finales)
         
         # Filtrar solo las columnas que existen en el DataFrame
         return [col for col in todas_columnas if col in df_reporte.columns]
@@ -1093,8 +1178,11 @@ class ComparadorDatos:
         """
         Muestra un resumen estadístico del reporte
         """
-        di_individuales = df_reporte[df_reporte['4. Número DI'] != 'VALORES ACUMULADOS']
-        di_individuales = di_individuales[di_individuales['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)']
+        # Filtrar solo filas individuales (excluyendo totales acumulados)
+        di_individuales = df_reporte[
+            (df_reporte['4. Número DI'] != 'VALORES ACUMULADOS') & 
+            (df_reporte['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)')
+        ]
         
         print(f"\n📈 RESUMEN ESTADÍSTICO:")
         print(f"   • Total DI procesadas: {len(di_individuales)}")
