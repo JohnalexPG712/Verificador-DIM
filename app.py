@@ -75,8 +75,7 @@ def inicializar_estados():
 def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, estadisticas_validacion, validacion_integridad):
     """Muestra los resultados de validación en el formato específico solicitado"""
     
-# Información del Proveedor
-    
+    # Información del Proveedor
     st.markdown("### 👤 Información del Proveedor")
     nit = datos_proveedor.get('nit', 'No disponible')
     nombre = datos_proveedor.get('nombre', 'No disponible')
@@ -292,13 +291,18 @@ def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
 # =============================================================================
 
 def mostrar_resumen_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
-    """Muestra solo el resumen esencial de la comparación DIM vs Subpartidas"""
+    """Muestra solo el resumen esencial de la comparación DIM vs Subpartidas - CORREGIDO"""
     
     if reporte_comparacion is None or reporte_comparacion.empty:
         return
     
-    # Resumen estadístico simplificado
-    di_individuales = reporte_comparacion[reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS']
+    # Resumen estadístico simplificado - CONTEO CORREGIDO
+    # Filtrar solo filas individuales (excluyendo totales acumulados)
+    di_individuales = reporte_comparacion[
+        (reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS') & 
+        (reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)')
+    ]
+    
     conformes = len(di_individuales[di_individuales['Resultado verificación'] == '✅ CONFORME'])
     con_diferencias = len(di_individuales[di_individuales['Resultado verificación'] == '❌ CON DIFERENCIAS'])
     
@@ -354,7 +358,15 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             
             st.success(f"✅ Datos de subpartidas extraídos: {len(datos_subpartidas)} registros")
             
+            # Detectar si hay múltiples subpartidas para mostrar info
             comparador = ComparadorDatos()
+            multiples_subpartidas = comparador.detectar_multiples_subpartidas(datos_subpartidas)
+            
+            if multiples_subpartidas:
+                st.info(f"🔍 Detectadas {len(datos_subpartidas)} subpartidas - Aplicando lógica de suma y comparación")
+            else:
+                st.info("🔍 Subpartida única detectada - Aplicando lógica estándar")
+            
             output_comparacion = os.path.join(temp_dir, "comparacion_dim_subpartidas.xlsx")
             reporte_comparacion = comparador.generar_reporte_comparacion(
                 datos_dian, datos_subpartidas, output_comparacion
@@ -423,7 +435,8 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
                 'datos_proveedor': datos_proveedor,
                 'resumen_codigos': resumen_codigos,
                 'estadisticas_validacion': estadisticas_validacion,
-                'validacion_integridad': validacion_integridad
+                'validacion_integridad': validacion_integridad,
+                'multiples_subpartidas': multiples_subpartidas  # Nuevo campo para tracking
             }
 
         except Exception as e:
@@ -490,7 +503,11 @@ def mostrar_resultados_en_pantalla():
             # Mostrar tabla de resultados con resaltado SOLO para diferencias
             st.markdown("**Detalle por Declaración:**")
             
-            di_individuales = reporte[reporte['4. Número DI'] != 'VALORES ACUMULADOS']
+            # Filtrar solo filas individuales (excluyendo totales acumulados)
+            di_individuales = reporte[
+                (reporte['4. Número DI'] != 'VALORES ACUMULADOS') & 
+                (reporte['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)')
+            ]
             
             def resaltar_solo_diferencias(row):
                 """Resalta SOLO filas que tienen diferencias (❌)"""
@@ -514,6 +531,16 @@ def mostrar_resultados_en_pantalla():
                 # Resaltar también los totales si hay diferencias
                 if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
                     st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
+            
+            # MOSTRAR TOTALES MÚLTIPLES SUBPARTIDAS (si existe)
+            fila_totales_multiples = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)']
+            if not fila_totales_multiples.empty:
+                st.markdown("**Totales Múltiples Subpartidas:**")
+                st.dataframe(fila_totales_multiples, use_container_width=True)
+                
+                # Resaltar también los totales si hay diferencias
+                if '❌' in str(fila_totales_multiples.iloc[0]['Resultado verificación']):
+                    st.warning("⚠️ Se detectaron diferencias en los totales de múltiples subpartidas")
 
 def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
@@ -706,18 +733,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
