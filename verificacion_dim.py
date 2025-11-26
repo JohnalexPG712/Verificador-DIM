@@ -662,7 +662,7 @@ class ComparadorDatos:
                             coincide = False
                             if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
                             elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
-                            else: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
+                            else: coincide = diferencia_absoluta < 1.0 and diferencia_porcentual < 1.0
                             
                             if coincide:
                                 fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
