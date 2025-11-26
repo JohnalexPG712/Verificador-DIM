@@ -3,13 +3,17 @@ import pandas as pd
 import os
 import re
 import tempfile
+import io
+import sys
+from contextlib import redirect_stdout
+
+# Importamos las clases del script optimizado
 from verificacion_dim import (
     ExtractorDIANSimplificado,
     ComparadorDatos, 
     ExtractorSubpartidas,
     ValidadorDeclaracionImportacionCompleto
 )
-from collections import Counter, defaultdict
 
 # Configuración de la página
 st.set_page_config(
@@ -18,7 +22,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS sin bordes punteados
+# Estilos CSS sin bordes punteados (Visualización exacta solicitada)
 st.markdown("""
 <style>
     .file-info {
@@ -37,7 +41,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Inicializar estados de sesión si no existen
+# Inicializar estados de sesión
 def inicializar_estados():
     if 'uploader_key_counter' not in st.session_state:
         st.session_state.uploader_key_counter = 0
@@ -45,11 +49,12 @@ def inicializar_estados():
         st.session_state.procesamiento_completado = False
     if 'download_counter' not in st.session_state:
         st.session_state.download_counter = 0
-    # Estados para los datos
+    # Estados para los datos binarios (Excel)
     if 'comparacion_data' not in st.session_state:
         st.session_state.comparacion_data = None
     if 'anexos_data' not in st.session_state:
         st.session_state.anexos_data = None
+    # DataFrames y Objetos
     if 'reporte_comparacion' not in st.session_state:
         st.session_state.reporte_comparacion = None
     if 'reporte_anexos' not in st.session_state:
@@ -58,7 +63,7 @@ def inicializar_estados():
         st.session_state.datos_dian = None
     if 'datos_subpartidas' not in st.session_state:
         st.session_state.datos_subpartidas = None
-    # Nuevos estados para los resúmenes
+    # Resúmenes de Validación
     if 'datos_proveedor' not in st.session_state:
         st.session_state.datos_proveedor = None
     if 'resumen_codigos' not in st.session_state:
@@ -69,7 +74,7 @@ def inicializar_estados():
         st.session_state.validacion_integridad = None
 
 # =============================================================================
-# NUEVAS FUNCIONES PARA MOSTRAR RESULTADOS EN EL FORMATO ESPECÍFICO
+# FUNCIONES DE VISUALIZACIÓN (MANTIENEN FORMATO EXACTO)
 # =============================================================================
 
 def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, estadisticas_validacion, validacion_integridad):
@@ -89,7 +94,6 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
             nombre_doc = info.get('nombre', 'DOCUMENTO')
             st.markdown(f"• **Código {codigo}:** {cantidad} - {nombre_doc}")
 
-    
     # Validación de Integridad (si hay problemas críticos)
     tiene_problemas_criticos = False
     if validacion_integridad:
@@ -119,7 +123,6 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
         **✅ DI Procesadas:** {total_di_procesadas} de {total_di_anexos} totales
         """
     )
-    
     
     # Estado de la Validación
     st.markdown("### 📋 Estado de la Validación")
@@ -165,14 +168,17 @@ def mostrar_resultados_validacion_formateados(datos_proveedor, resumen_codigos, 
     
     st.markdown(f"📈 {total_di_procesadas} de {total_di_anexos} DI procesadas | ✅ {declaraciones_correctas} correctas | ❌ {estadisticas_validacion.get('declaraciones_con_errores', 0)} con diferencias")
 
+# =============================================================================
+# FUNCIONES DE EXTRACCIÓN DE CONSOLA (COMPATIBLES CON NUEVO SCRIPT)
+# =============================================================================
+
 def extraer_datos_de_consola_mejorado(consola_output):
-    """Extrae datos del proveedor de la salida de consola - MEJORADO"""
+    """Extrae datos del proveedor de la salida de consola"""
     datos = {'nit': 'No disponible', 'nombre': 'No disponible'}
-    
     lineas = consola_output.split('\n')
     for i, linea in enumerate(lineas):
+        # Compatibilidad con formato "   🆔 NIT: 12345"
         if 'NIT:' in linea:
-            # Buscar NIT en la línea actual o siguiente
             nit_match = re.search(r'NIT:\s*([0-9]+)', linea)
             if nit_match:
                 datos['nit'] = nit_match.group(1)
@@ -181,8 +187,8 @@ def extraer_datos_de_consola_mejorado(consola_output):
                 if nit_match:
                     datos['nit'] = nit_match.group(1)
         
+        # Compatibilidad con formato "   📛 Nombre: PROVEEDOR"
         if 'Nombre:' in linea or 'Razón Social:' in linea:
-            # Buscar nombre en la línea actual o siguiente
             nombre_match = re.search(r'(?:Nombre|Razón Social):\s*(.+)', linea)
             if nombre_match:
                 datos['nombre'] = nombre_match.group(1).strip()
@@ -190,11 +196,10 @@ def extraer_datos_de_consola_mejorado(consola_output):
                 nombre_texto = lineas[i + 1].strip()
                 if nombre_texto and not nombre_texto.isdigit():
                     datos['nombre'] = nombre_texto
-    
     return datos
 
 def extraer_resumen_de_consola_mejorado(consola_output):
-    """Extrae resumen de códigos Y validación de integridad de la salida de consola - MEJORADO"""
+    """Extrae resumen de códigos Y validación de integridad de la salida de consola"""
     resumen = {}
     validacion_integridad = {}
     
@@ -224,6 +229,7 @@ def extraer_resumen_de_consola_mejorado(consola_output):
                             'di': match.group(1),
                             'levantes': match.group(2)
                         }
+            # Detectar fin de sección de validación
             elif not linea.strip() or '📋 Declaraciones encontradas:' in linea:
                 en_validacion = False
         
@@ -233,6 +239,7 @@ def extraer_resumen_de_consola_mejorado(consola_output):
             continue
         
         if en_resumen and linea.strip().startswith('•'):
+            # Formato: "   • Código 9: 10 - DECLARACION..."
             match = re.search(r'•\s*Código\s+(\d+):\s*(\d+)\s*-\s*(.+)', linea)
             if match:
                 codigo = match.group(1)
@@ -246,7 +253,7 @@ def extraer_resumen_de_consola_mejorado(consola_output):
     return resumen, validacion_integridad
 
 def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
-    """Extrae estadísticas REALES de la salida de consola - MEJORADO"""
+    """Extrae estadísticas REALES de la salida de consola"""
     estadisticas = {
         'total_anexos': 0,
         'total_di': 0,
@@ -259,19 +266,19 @@ def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
     lineas = consola_output.split('\n')
     
     for linea in lineas:
-        # Buscar total de anexos
+        # Buscar total de anexos (Formato: "✅ 77 anexos encontrados")
         if 'anexos encontrados' in linea:
             match = re.search(r'✅\s*(\d+)\s*anexos', linea)
             if match:
                 estadisticas['total_anexos'] = int(match.group(1))
         
-        # Buscar total DI en anexos
+        # Buscar total DI en anexos (usando el resumen por código)
         if 'Código 9:' in linea:
             match = re.search(r'Código\s*9:\s*(\d+)', linea)
             if match:
                 estadisticas['total_di'] = int(match.group(1))
         
-        # Buscar declaraciones con errores
+        # Buscar declaraciones con errores (Formato: "   • Declaraciones con errores: 3")
         if 'Declaraciones con errores:' in linea:
             match = re.search(r'Declaraciones con errores:\s*(\d+)', linea)
             if match:
@@ -286,18 +293,13 @@ def extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian):
     
     return estadisticas
 
-# =============================================================================
-# FUNCIONES AUXILIARES EXISTENTES (SIMPLIFICADAS)
-# =============================================================================
-
 def mostrar_resumen_comparacion_simplificado(reporte_comparacion, datos_dian, datos_subpartidas):
-    """Muestra solo el resumen esencial de la comparación DIM vs Subpartidas - CORREGIDO"""
+    """Muestra solo el resumen esencial de la comparación DIM vs Subpartidas"""
     
     if reporte_comparacion is None or reporte_comparacion.empty:
         return
     
-    # Resumen estadístico simplificado - CONTEO CORREGIDO
-    # Filtrar solo filas individuales (excluyendo totales acumulados)
+    # Filtrar solo filas individuales (excluyendo totales acumulados para conteo real)
     di_individuales = reporte_comparacion[
         (reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS') & 
         (reporte_comparacion['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)')
@@ -316,11 +318,11 @@ def mostrar_resumen_comparacion_simplificado(reporte_comparacion, datos_dian, da
         st.metric("DI con diferencias", con_diferencias)
 
 # =============================================================================
-# FUNCIONES PRINCIPALES ACTUALIZADAS
+# LÓGICA DE PROCESAMIENTO
 # =============================================================================
 
 def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
-    """Procesa la conciliación con los archivos cargados - ACTUALIZADA"""
+    """Procesa la conciliación con los archivos cargados"""
     
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
@@ -337,7 +339,7 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             with open(excel_anexos_path, "wb") as f:
                 f.write(excel_anexos.getbuffer())
 
-            # Procesar comparación DIM vs Subpartidas
+            # 1. Comparación DIM vs Subpartidas
             st.info("🔍 Comparando DIM vs Subpartidas...")
             
             extractor_dian = ExtractorDIANSimplificado()
@@ -358,7 +360,6 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
             
             st.success(f"✅ Datos de subpartidas extraídos: {len(datos_subpartidas)} registros")
             
-            # Detectar si hay múltiples subpartidas para mostrar info
             comparador = ComparadorDatos()
             multiples_subpartidas = comparador.detectar_multiples_subpartidas(datos_subpartidas)
             
@@ -372,54 +373,45 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
                 datos_dian, datos_subpartidas, output_comparacion
             )
 
-            # Procesar validación de anexos
+            # 2. Validación de anexos (Capturando salida de consola para UI)
             st.info("🔄 Validando anexos FMM...")
             
             validador = ValidadorDeclaracionImportacionCompleto()
             output_anexos = os.path.join(temp_dir, "validacion_anexos.xlsx")
             
-            # CAPTURAR LA SALIDA DE CONSOLA DEL VALIDADOR
-            import io
-            import sys
-            from contextlib import redirect_stdout
-            
-            # Crear un buffer para capturar la salida
+            # Crear buffer para capturar los prints del script optimizado
             output_buffer = io.StringIO()
-            
             with redirect_stdout(output_buffer):
+                # Ejecutar validación (ahora devuelve DataFrame o None)
                 resultado_validacion = validador.procesar_validacion_completa(temp_dir, output_anexos)
             
-            # Obtener la salida de consola
             consola_output = output_buffer.getvalue()
             
-            # EXTRAER DATOS REALES DEL PROCESAMIENTO CON LAS NUEVAS FUNCIONES
+            # Extraer metadatos desde la salida capturada
             datos_proveedor = extraer_datos_de_consola_mejorado(consola_output)
             resumen_codigos, validacion_integridad = extraer_resumen_de_consola_mejorado(consola_output)
             estadisticas_validacion = extraer_estadisticas_de_consola_mejorado(consola_output, datos_dian)
             
-            # Si el validador retorna un diccionario, usarlo, sino usar los datos extraídos
+            # Determinar el reporte de anexos final
             if isinstance(resultado_validacion, dict):
+                # Por si acaso devolviera un diccionario (versiones anteriores)
                 reporte_anexos = resultado_validacion.get('reporte_anexos')
-                # Combinar con datos extraídos de consola
-                datos_proveedor = resultado_validacion.get('datos_proveedor', datos_proveedor)
-                resumen_codigos = resultado_validacion.get('resumen_codigos', resumen_codigos)
-                estadisticas_validacion = resultado_validacion.get('estadisticas_validacion', estadisticas_validacion)
             else:
+                # La nueva versión devuelve el DataFrame directamente
                 reporte_anexos = resultado_validacion
 
-            # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
+            # Guardar resultados binarios en session_state para descarga
             with open(output_comparacion, "rb") as f:
                 st.session_state.comparacion_data = f.read()
             
             with open(output_anexos, "rb") as f:
                 st.session_state.anexos_data = f.read()
             
-            # Guardar también los DataFrames completos para mostrar resultados
+            # Actualizar estados de sesión
             st.session_state.reporte_comparacion = reporte_comparacion
             st.session_state.reporte_anexos = reporte_anexos
             st.session_state.datos_dian = datos_dian
             st.session_state.datos_subpartidas = datos_subpartidas
-            # Guardar las variables de resumen
             st.session_state.datos_proveedor = datos_proveedor
             st.session_state.resumen_codigos = resumen_codigos
             st.session_state.estadisticas_validacion = estadisticas_validacion
@@ -427,31 +419,20 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
 
             return {
                 'comparacion': reporte_comparacion is not None,
-                'anexos': reporte_anexos is not None,
-                'datos_dian': datos_dian,
-                'datos_subpartidas': datos_subpartidas,
-                'reporte_comparacion': reporte_comparacion,
-                'reporte_anexos': reporte_anexos,
-                'datos_proveedor': datos_proveedor,
-                'resumen_codigos': resumen_codigos,
-                'estadisticas_validacion': estadisticas_validacion,
-                'validacion_integridad': validacion_integridad,
-                'multiples_subpartidas': multiples_subpartidas  # Nuevo campo para tracking
+                'anexos': reporte_anexos is not None
             }
 
         except Exception as e:
             st.error(f"❌ Error en el procesamiento: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
             return None
 
 def mostrar_resultados_en_pantalla():
-    """Muestra los resultados detallados en pantalla usando session_state - ACTUALIZADA Y SIMPLIFICADA"""
+    """Muestra los resultados detallados en pantalla"""
     
     st.markdown("---")
     st.header("📋 Resultados de la Verificación")
     
-    # MOSTRAR RESULTADOS DE VALIDACIÓN EN EL NUEVO FORMATO (PRIMERO)
+    # 1. Validación de Proveedores e Integridad
     if (st.session_state.datos_proveedor is not None and 
         st.session_state.resumen_codigos is not None and 
         st.session_state.estadisticas_validacion is not None):
@@ -465,7 +446,7 @@ def mostrar_resultados_en_pantalla():
     else:
         st.error("No se pudieron cargar los datos de validación")
 
-    # RESULTADO COMPARACIÓN DIM vs SUBPARTIDAS - SOLO RESUMEN
+    # 2. Resumen Comparación DIM
     st.markdown("---")
     if st.session_state.reporte_comparacion is not None:
         mostrar_resumen_comparacion_simplificado(
@@ -474,269 +455,113 @@ def mostrar_resultados_en_pantalla():
             st.session_state.datos_subpartidas
         )
 
-    # Resultados de Validación de Anexos - TABLA DETALLADA (OPCIONAL)
+    # 3. Tablas Detalladas (Expansibles)
     with st.expander("🔍 Ver Detalle de Validación de Anexos"):
-        if st.session_state.reporte_anexos is not None:
-            reporte_anexos = st.session_state.reporte_anexos
-            
-            if reporte_anexos is not None and not reporte_anexos.empty:
-                # Mostrar tabla de validación con resaltado SOLO para diferencias
-                st.markdown("**Detalle de Validación:**")
-                
-                def resaltar_solo_validacion_anexos(row):
-                    """Resalta SOLO filas que no coinciden en la validación de anexos"""
-                    if row['Coincidencias'] == '❌ NO COINCIDE':
-                        return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
-                    else:
-                        return [''] * len(row)  # Sin resaltado para coincidencias
-                
-                # Aplicar el estilo
-                styled_anexos = reporte_anexos.style.apply(resaltar_solo_validacion_anexos, axis=1)
-                
-                st.dataframe(styled_anexos, use_container_width=True)
+        if st.session_state.reporte_anexos is not None and not st.session_state.reporte_anexos.empty:
+            def resaltar_anexos(row):
+                return ['background-color: #ffcccc'] * len(row) if row['Coincidencias'] == '❌ NO COINCIDE' else [''] * len(row)
+            st.dataframe(st.session_state.reporte_anexos.style.apply(resaltar_anexos, axis=1), use_container_width=True)
 
-    # Resultados de Comparación DIM vs Subpartidas - TABLA DETALLADA (OPCIONAL)
     with st.expander("🔍 Ver Detalle de Comparación DIM vs Subpartidas"):
         if st.session_state.reporte_comparacion is not None:
             reporte = st.session_state.reporte_comparacion
             
-            # Mostrar tabla de resultados con resaltado SOLO para diferencias
-            st.markdown("**Detalle por Declaración:**")
-            
-            # Filtrar solo filas individuales (excluyendo totales acumulados)
+            # Filas individuales
             di_individuales = reporte[
-                (reporte['4. Número DI'] != 'VALORES ACUMULADOS') & 
-                (reporte['4. Número DI'] != 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)')
+                ~reporte['4. Número DI'].str.contains('VALORES ACUMULADOS', na=False)
             ]
             
-            def resaltar_solo_diferencias(row):
-                """Resalta SOLO filas que tienen diferencias (❌)"""
-                if '❌' in str(row['Resultado verificación']):
-                    return ['background-color: #ffcccc'] * len(row)  # Rojo claro solo para diferencias
-                else:
-                    return [''] * len(row)  # Sin resaltado para conformes
+            def resaltar_diferencias(row):
+                return ['background-color: #ffcccc'] * len(row) if '❌' in str(row['Resultado verificación']) else [''] * len(row)
             
-            # Aplicar el estilo
-            styled_reporte = di_individuales.style.apply(resaltar_solo_diferencias, axis=1)
+            st.markdown("**Detalle por Declaración:**")
+            st.dataframe(di_individuales.style.apply(resaltar_diferencias, axis=1), use_container_width=True)
             
-            # Mostrar la tabla con estilos
-            st.dataframe(styled_reporte, use_container_width=True)
-            
-            # MOSTRAR TOTALES ACUMULADOS (como estaba antes)
-            fila_totales = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS']
+            # Totales
+            fila_totales = reporte[reporte['4. Número DI'].str.contains('VALORES ACUMULADOS', na=False)]
             if not fila_totales.empty:
                 st.markdown("**Totales Acumulados:**")
                 st.dataframe(fila_totales, use_container_width=True)
-                
-                # Resaltar también los totales si hay diferencias
-                if '❌' in str(fila_totales.iloc[0]['Resultado verificación']):
-                    st.warning("⚠️ Se detectaron diferencias en los totales acumulados")
-            
-            # MOSTRAR TOTALES MÚLTIPLES SUBPARTIDAS (si existe)
-            fila_totales_multiples = reporte[reporte['4. Número DI'] == 'VALORES ACUMULADOS (MÚLTIPLES SUBPARTIDAS)']
-            if not fila_totales_multiples.empty:
-                st.markdown("**Totales Múltiples Subpartidas:**")
-                st.dataframe(fila_totales_multiples, use_container_width=True)
-                
-                # Resaltar también los totales si hay diferencias
-                if '❌' in str(fila_totales_multiples.iloc[0]['Resultado verificación']):
-                    st.warning("⚠️ Se detectaron diferencias en los totales de múltiples subpartidas")
+                if any('❌' in str(val) for val in fila_totales['Resultado verificación'].values):
+                    st.warning("⚠️ Se detectaron diferencias en los totales")
 
 def mostrar_botones_descarga():
     """Muestra los botones para descargar los Excel"""
-    
     st.markdown("---")
-    st.markdown(
-    "<h2 style='text-align: center;'>📥 Descargar Resultados Completos</h2>",
-    unsafe_allow_html=True
-)
+    st.markdown("<h2 style='text-align: center;'>📥 Descargar Resultados Completos</h2>", unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.session_state.comparacion_data is not None:
-            # Usar una key única dinámica basada en el contador
-            download_key_comp = f"download_comparacion_{st.session_state.download_counter}"
+        if st.session_state.comparacion_data:
             st.download_button(
                 label="📥 Descargar Validación DIM vs Subpartidas (Excel)",
                 data=st.session_state.comparacion_data,
                 file_name="Comparacion_DIM_Subpartidas.xlsx",
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
-                key=download_key_comp
+                key=f"dl_comp_{st.session_state.download_counter}"
             )
         else:
-            st.button(
-                "📊 Comparación No Disponible",
-                disabled=True,
-                use_container_width=True
-            )
+            st.button("📊 Comparación No Disponible", disabled=True, use_container_width=True)
     
     with col2:
-        if st.session_state.anexos_data is not None:
-            # Usar una key única dinámica basada en el contador
-            download_key_anex = f"download_anexos_{st.session_state.download_counter}"
+        if st.session_state.anexos_data:
             st.download_button(
                 label="📥 Descargar Comparación Anexos FMM (Excel)",
                 data=st.session_state.anexos_data,
                 file_name="Validacion_Anexos_FMM.xlsx", 
                 mime="application/vnd.ms-excel",
                 use_container_width=True,
-                key=download_key_anex
+                key=f"dl_anex_{st.session_state.download_counter}"
             )
         else:
-            st.button(
-                "📋 Validación No Disponible",
-                disabled=True,
-                use_container_width=True
-            )
+            st.button("📋 Validación No Disponible", disabled=True, use_container_width=True)
+
+# =============================================================================
+# MAIN
+# =============================================================================
 
 def main():
     inicializar_estados()
-    
-    # Header principal
     st.title("Aplicación de Verificación DIM vs FMM - SmartDIM 🚀 ")
     
-    # Instrucciones en sidebar
     with st.sidebar:
-        st.header("🧭 Instrucciones de uso")
-        st.markdown("""
-        1. Cargar Declaraciones PDF (DIM)
-        2. Cargar Excel Subpartidas FMM
-        3. Cargar Excel Anexos FMM
-        4. Ejecutar Verificación
-        5. Ver resultados en pantalla y descargar
-        """)
-        
-        # Botón de limpieza
-        if st.button("🧹 Limpiar Todo y Reiniciar", type="secondary", use_container_width=True):
-            # Limpiar todo el estado específico
-            st.session_state.comparacion_data = None
-            st.session_state.anexos_data = None
-            st.session_state.reporte_comparacion = None
-            st.session_state.reporte_anexos = None
-            st.session_state.datos_dian = None
-            st.session_state.datos_subpartidas = None
-            st.session_state.datos_proveedor = None
-            st.session_state.resumen_codigos = None
-            st.session_state.estadisticas_validacion = None
-            st.session_state.validacion_integridad = None
-            st.session_state.procesamiento_completado = False
-            
-            # Incrementar el contador para forzar nuevos file uploaders
-            st.session_state.uploader_key_counter += 1
-            st.session_state.download_counter += 1
-            
-            # Mensaje de confirmación
-            st.sidebar.success("✅ Todo ha sido limpiado. Puedes cargar nuevos archivos.")
-            
-            # Forzar actualización
+        st.header("🧭 Instrucciones")
+        st.markdown("1. Cargar PDFs DIM\n2. Cargar Excel Subpartidas\n3. Cargar Excel Anexos\n4. Ejecutar Verificación")
+        if st.button("🧹 Limpiar Todo", type="secondary", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
 
-    # Sección de carga de archivos
+    # Carga de Archivos
     st.header("Cargar Archivos")
-
-    # Usar el contador como parte de la key para forcear reset
-    current_key = st.session_state.uploader_key_counter
-
-    # Declaraciones PDF (DIAN)
-    st.subheader("Declaraciones PDF (DIAN)")
-    dian_pdfs = st.file_uploader(
-        "Arrastre y suelte archivos PDF de DIAN aquí",
-        type=['pdf'],
-        accept_multiple_files=True,
-        key=f"dian_pdfs_{current_key}"
-    )
-    st.caption("Límite: 200 MB por archivo • PDF")
-
-    if dian_pdfs:
-        st.markdown("**Archivos cargados:**")
-        for pdf in dian_pdfs:
-            st.markdown(f'<div class="file-info">📄 {pdf.name} ({pdf.size / 1024 / 1024:.1f} MB)</div>', 
-                       unsafe_allow_html=True)
-
-    # Excel de Subpartidas
-    st.subheader("Archivo Excel (Subpartidas)")
-    excel_subpartidas = st.file_uploader(
-        "Arrastre y suelte Excel de subpartidas aquí",
-        type=['xlsx', 'xls'],
-        key=f"excel_subpartidas_{current_key}"
-    )
-    st.caption("Formatos soportados: XLSX, XLS")
-
-    if excel_subpartidas:
-        st.markdown(f'<div class="file-info">📋 {excel_subpartidas.name} ({excel_subpartidas.size / 1024:.1f} KB)</div>', 
-                   unsafe_allow_html=True)
-
-    # Excel de Anexos/Proveedores
-    st.subheader("Archivo Excel (Anexos FMM)")
-    excel_anexos = st.file_uploader(
-        "Arrastre y suelte Excel de anexos FMM aquí",
-        type=['xlsx', 'xls'],
-        key=f"excel_anexos_{current_key}"
-    )
-    st.caption("Formatos soportados: XLSX, XLS")
-
-    if excel_anexos:
-        st.markdown(f'<div class="file-info">📋 {excel_anexos.name} ({excel_anexos.size / 1024:.1f} KB)</div>', 
-                   unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # Proceso de conciliación
-    st.header("Proceso: Verificación")
-
-    # Verificar archivos mínimos para nuevo procesamiento
-    archivos_cargados = (dian_pdfs and excel_subpartidas and excel_anexos)
-
-    # Mostrar resultados existentes si los hay
-    if st.session_state.procesamiento_completado and st.session_state.reporte_comparacion is not None:
-        st.info("📈 Mostrando resultados de conciliación previa. Puedes descargar los archivos o cargar nuevos para reprocesar.")
-        mostrar_resultados_en_pantalla()
-        mostrar_botones_descarga()
+    k = st.session_state.uploader_key_counter
+    dian_pdfs = st.file_uploader("PDFs DIAN", type=['pdf'], accept_multiple_files=True, key=f"pdfs_{k}")
+    excel_sub = st.file_uploader("Excel Subpartidas", type=['xlsx', 'xls'], key=f"sub_{k}")
+    excel_anex = st.file_uploader("Excel Anexos", type=['xlsx', 'xls'], key=f"anex_{k}")
+    
+    if dian_pdfs and excel_sub and excel_anex:
+        st.success("Archivos cargados correctamente. Listo para verificar.")
         
-        # Mostrar botón para nuevo procesamiento si hay archivos cargados
-        if archivos_cargados:
-            st.markdown("---")
-            st.subheader("Reprocesar con nuevos archivos")
-            if st.button("🔄 Ejecutar Nueva Verificación", type="primary", use_container_width=True):
-                with st.spinner("Procesando nueva verificación..."):
-                    resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
-                    if resultados:
-                        st.success("✅ Nueva verificación completada exitosamente")
+        # Lógica de re-renderizado si ya se procesó
+        if st.session_state.procesamiento_completado and st.session_state.reporte_comparacion is not None:
+            st.info("Mostrando resultados previos.")
+            mostrar_resultados_en_pantalla()
+            mostrar_botones_descarga()
+            if st.button("🔄 Ejecutar Nueva Verificación", type="primary"):
+                with st.spinner("Procesando..."):
+                    if procesar_conciliacion(dian_pdfs, excel_sub, excel_anex):
+                        st.session_state.procesamiento_completado = True
                         st.rerun()
-        return
-
-    # Si no hay resultados previos, procesar normalmente
-    if not archivos_cargados:
-        st.warning("⚠️ Cargue todos los archivos requeridos para continuar")
-        return
-
-    # Mostrar resumen
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("PDFs DIAN", len(dian_pdfs))
-    with col2:
-        st.metric("Excel Subpartidas", "✓" if excel_subpartidas else "✗")
-    with col3:
-        st.metric("Excel Anexos", "✓" if excel_anexos else "✗")
-
-    # Botón de procesamiento
-    if st.button("🔄 Ejecutar Verificación", type="primary", use_container_width=True):
-        with st.spinner("Procesando verificación..."):
-            resultados = procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos)
-            
-            if resultados:
-                st.session_state.procesamiento_completado = True
-                st.success("✅ Verificación completada exitosamente")
-                st.rerun()
+        else:
+            if st.button("🔄 Ejecutar Verificación", type="primary"):
+                with st.spinner("Procesando..."):
+                    if procesar_conciliacion(dian_pdfs, excel_sub, excel_anex):
+                        st.session_state.procesamiento_completado = True
+                        st.rerun()
+    else:
+        st.warning("⚠️ Cargue todos los archivos requeridos")
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
