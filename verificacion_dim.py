@@ -397,7 +397,7 @@ class ComparadorDatos:
                 if len(valores_numericos) > 1:
                     min_val = min(valores_numericos)
                     max_val = max(valores_numericos)
-                    if (max_val - min_val) / min_val < 0.05: return f"✅ {valor_actual_formateado}"
+                    if (max_val - min_val) / min_val < 0.01: return f"✅ {valor_actual_formateado}"
                 
                 valor_mas_comun = datos_dian[campo_dian].mode().iloc[0] if not datos_dian[campo_dian].mode().empty else None
                 if valor_actual != valor_mas_comun: return f"❌ {valor_actual_formateado}"
@@ -548,7 +548,7 @@ class ComparadorDatos:
                 txt_di = f"{valor_bultos_di_consolidado:.0f}"
                 txt_excel = f"{valor_bultos_excel_suma:.0f}"
                 
-                if diff < 1.0:
+                if diff == 0:
                     fila_totales[nombre_campo_di] = f"✅ {txt_di}"
                     fila_totales[nombre_campo_subpartida] = f"✅ {txt_excel}"
                 else:
@@ -579,9 +579,9 @@ class ComparadorDatos:
                     diferencia_absoluta = abs(float(total_di) - float(total_subpartida))
                     diferencia_porcentual = (diferencia_absoluta / float(total_subpartida)) * 100
                     coincide = False
-                    if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 0.5
-                    elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 0.10 or diferencia_porcentual < 1.0
-                    else: coincide = diferencia_absoluta < 0.1 or diferencia_porcentual < 0.1
+                    if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
+                    elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
+                    else: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
                     
                     if coincide:
                         fila_totales[nombre_campo_di] = f"✅ {total_di:.2f}"
@@ -632,7 +632,7 @@ class ComparadorDatos:
                 txt_di = f"{valor_bultos_di_consolidado:.0f}"
                 txt_excel = f"{float(valor_bultos_excel):.0f}"
                 
-                if diff < 1.0:
+                if diff == 0:
                     fila_totales[nombre_campo_di] = f"✅ {txt_di}"
                     fila_totales[nombre_campo_subpartida] = f"✅ {txt_excel}"
                 else:
@@ -660,9 +660,9 @@ class ComparadorDatos:
                             # CORRECCIÓN APLICADA AQUÍ: Usar valor_subpartida en lugar de total_subpartida
                             diferencia_porcentual = (diferencia_absoluta / float(valor_subpartida)) * 100
                             coincide = False
-                            if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 0.5
-                            elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 0.10 or diferencia_porcentual < 1.0
-                            else: coincide = diferencia_absoluta < 0.1 or diferencia_porcentual < 0.1
+                            if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
+                            elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
+                            else: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
                             
                             if coincide:
                                 fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
