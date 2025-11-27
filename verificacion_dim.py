@@ -223,7 +223,7 @@ class ExtractorDIANSimplificado:
         return pd.DataFrame(all_results) if all_results else None
 
 # =============================================================================
-# CLASE 2: COMPARACIÓN DE DATOS (CORREGIDA)
+# CLASE 2: COMPARACIÓN DE DATOS
 # =============================================================================
 
 class ComparadorDatos:
@@ -397,7 +397,7 @@ class ComparadorDatos:
                 if len(valores_numericos) > 1:
                     min_val = min(valores_numericos)
                     max_val = max(valores_numericos)
-                    if (max_val - min_val) / min_val < 0.01: return f"✅ {valor_actual_formateado}"
+                    if (max_val - min_val) / min_val < 0.05: return f"✅ {valor_actual_formateado}"
                 
                 valor_mas_comun = datos_dian[campo_dian].mode().iloc[0] if not datos_dian[campo_dian].mode().empty else None
                 if valor_actual != valor_mas_comun: return f"❌ {valor_actual_formateado}"
@@ -450,7 +450,7 @@ class ComparadorDatos:
             di = emparejamiento['di']
             subpartida = emparejamiento['subpartida']
             numero_di = di.get("4. Número DI", "Desconocido")
-            print(f"\n🔍 Procesando DI: {numero_di}")
+            # SILENCIADO: print(f"\n🔍 Procesando DI: {numero_di}")
             
             fila_reporte = {"4. Número DI": numero_di}
             
@@ -478,7 +478,7 @@ class ComparadorDatos:
                     emoji_sub = "✅" if coinciden else "❌"
                     fila_reporte[f"{campo_dian} DI"] = f"{emoji_di} {val_di_fmt}"
                     fila_reporte[f"{campo_dian} Subpartida"] = f"{emoji_sub} {val_sub_fmt}"
-                    print(f"   📊 Subpartida - DI: {emoji_di} {val_di_fmt}, Excel: {emoji_sub} {val_sub_fmt}")
+                    # SILENCIADO: print(f"   📊 Subpartida - DI: {emoji_di} {val_di_fmt}, Excel: {emoji_sub} {val_sub_fmt}")
                 else:
                     fila_reporte[f"{campo_dian} DI"] = val_di_fmt
                     fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt
@@ -493,7 +493,7 @@ class ComparadorDatos:
                 fila_reporte[f"{campo_dian} DI"] = val_di_fmt if val_di_fmt != "N/A" else None
                 fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt if val_sub_fmt != "N/A" else None
                 
-                print(f"   📦 Bultos - DI: {val_di_fmt}, Subpartida: {val_sub_fmt}")
+                # SILENCIADO: print(f"   📦 Bultos - DI: {val_di_fmt}, Subpartida: {val_sub_fmt}")
                 
             for campo, (campo_dian, _) in self.campos_acumulables.items():
                 valor_dian = di.get(campo_dian, None)
@@ -504,7 +504,7 @@ class ComparadorDatos:
             tiene_errores = self.determinar_resultado_final(di, subpartida if subpartida is not None else {}, multiples_subpartidas)
             fila_reporte["Resultado verificación"] = "❌ CON DIFERENCIAS" if tiene_errores else "✅ CONFORME"
             reporte_filas.append(fila_reporte)
-            print(f"   {'❌' if tiene_errores else '✅'} DI: {numero_di} - {'CON DIFERENCIAS' if tiene_errores else 'CONFORME'}")
+            # SILENCIADO: print(f"   {'❌' if tiene_errores else '✅'} DI: {numero_di} - {'CON DIFERENCIAS' if tiene_errores else 'CONFORME'}")
         
         if multiples_subpartidas:
             self._agregar_totales_multiples_subpartidas(reporte_filas, datos_dian, datos_subpartidas)
@@ -548,7 +548,7 @@ class ComparadorDatos:
                 txt_di = f"{valor_bultos_di_consolidado:.0f}"
                 txt_excel = f"{valor_bultos_excel_suma:.0f}"
                 
-                if diff == 0:
+                if diff < 1.0:
                     fila_totales[nombre_campo_di] = f"✅ {txt_di}"
                     fila_totales[nombre_campo_subpartida] = f"✅ {txt_excel}"
                 else:
@@ -657,12 +657,11 @@ class ComparadorDatos:
                     try:
                         if self.es_valor_valido(valor_subpartida) and total_dian != 0:
                             diferencia_absoluta = abs(float(total_dian) - float(valor_subpartida))
-                            # CORRECCIÓN APLICADA AQUÍ: Usar valor_subpartida en lugar de total_subpartida
                             diferencia_porcentual = (diferencia_absoluta / float(valor_subpartida)) * 100
                             coincide = False
                             if campo_dian == "78. Valor FOB USD": coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
                             elif campo_dian in ["79. Valor Fletes USD", "80. Valor Seguros USD", "81. Valor Otros Gastos USD"]: coincide = diferencia_absoluta < 1.0 or diferencia_porcentual < 1.0
-                            else: coincide = diferencia_absoluta < 1.0 and diferencia_porcentual < 1.0
+                            else: coincide = diferencia_absoluta < 0.1 and diferencia_porcentual < 0.1
                             
                             if coincide:
                                 fila_totales[nombre_campo_di] = f"✅ {total_dian:.2f}"
@@ -964,19 +963,39 @@ class ValidadorDeclaracionImportacionCompleto:
                 except: fila_actual += 1; continue
             wb.close()
             df_resultado = pd.DataFrame(datos_anexos)
+            
+            # === CORRECCIÓN DE TIPOS PARA VALIDACIÓN ESTRICTA ===
             if not df_resultado.empty:
+                # Convertir Documento a string para que coincida con el PDF
+                df_resultado['Documento'] = df_resultado['Documento'].astype(str).str.strip()
+                
                 print(f"✅ {len(df_resultado)} anexos encontrados")
                 resumen = df_resultado.groupby('Codigo').agg({'Descripcion': 'first', 'Documento': 'count'}).reset_index()
                 print("📊 Resumen por código:")
                 for _, row in resumen.iterrows():
                     print(f"   • Código {row['Codigo']}: {row['Documento']} - {row['Descripcion']}")
                 
-                count_di = len(df_resultado[df_resultado['Codigo'] == 9])
-                count_levante = len(df_resultado[df_resultado['Codigo'] == 47])
-                if count_di == count_levante:
-                     print(f"✅ Balance correcto: {count_di} DI = {count_levante} Levantes")
+                di_rows = df_resultado[df_resultado['Codigo'] == 9]
+                lev_rows = df_resultado[df_resultado['Codigo'] == 47]
+                
+                di_dupes = di_rows[di_rows.duplicated('Documento', keep=False)]['Documento'].unique()
+                lev_dupes = lev_rows[lev_rows.duplicated('Documento', keep=False)]['Documento'].unique()
+                
+                count_di = len(di_rows)
+                count_lev = len(lev_rows)
+                
+                has_integrity_issues = len(di_dupes) > 0 or len(lev_dupes) > 0 or count_di != count_lev
+                
+                if has_integrity_issues:
+                    print("\n🔍 VALIDACIÓN DE INTEGRIDAD:")
+                    if len(di_dupes) > 0:
+                        print(f"   ❌ {len(di_dupes)} DI duplicadas: {', '.join(map(str, di_dupes))}")
+                    if len(lev_dupes) > 0:
+                        print(f"   ❌ {len(lev_dupes)} Levantes duplicados: {', '.join(map(str, lev_dupes))}")
+                    if count_di != count_lev:
+                        print(f"   ❌ Desbalance: {count_di} DI vs {count_lev} Levantes")
                 else:
-                     print(f"❌ Desbalance: {count_di} DI vs {count_levante} Levantes")
+                    print(f"✅ Balance correcto: {count_di} DI = {count_lev} Levantes")
 
             return df_resultado
         except Exception as e:
@@ -1014,8 +1033,10 @@ class ValidadorDeclaracionImportacionCompleto:
                 if match:
                     if match.groups():
                         for group_val in match.groups():
-                            if group_val and group_val.strip(): return group_val.strip()
-                    else: return match.group(0).strip()
+                            if group_val and group_val.strip():
+                                return group_val.strip()
+                    else:
+                        return match.group(0).strip()
             except: continue
         return "NO ENCONTRADO"
 
@@ -1092,7 +1113,48 @@ class ValidadorDeclaracionImportacionCompleto:
                             res['Coincidencias'] = '✅ COINCIDE' if self._comparar_nombres_optimizado(nom_pdf, self.nombre_proveedor) else '❌ NO COINCIDE'
                 else:
                     codes = config["codigo_formulario"] if isinstance(config["codigo_formulario"], list) else [config["codigo_formulario"]]
-                    anexos = anexos_formulario[anexos_formulario['Codigo'].isin(codes)]
+                    
+                    # --- FILTRO ESTRICTO (TODOS COMO STRING) ---
+                    if 9 in codes:
+                        anexos = anexos_formulario[
+                            (anexos_formulario['Codigo'].isin(codes)) & 
+                            (anexos_formulario['Documento'] == str(di_num)) # Forzar string
+                        ]
+                    elif 47 in codes:
+                        levante_num = datos_declaracion.get("134. Levante No.", "NO ENCONTRADO")
+                        anexos = anexos_formulario[
+                            (anexos_formulario['Codigo'].isin(codes)) & 
+                            (anexos_formulario['Documento'] == str(levante_num))
+                        ]
+                    elif 93 in codes: # Manifiesto
+                        manif_num = datos_declaracion.get("42. No. Manifiesto de Carga", "NO ENCONTRADO")
+                        anexos = anexos_formulario[
+                            (anexos_formulario['Codigo'].isin(codes)) & 
+                            (anexos_formulario['Documento'] == str(manif_num))
+                        ]
+                    elif 17 in codes or 91 in codes: # Transporte
+                        transp_num = datos_declaracion.get("44. No. Documento de Transporte", "NO ENCONTRADO")
+                        anexos = anexos_formulario[
+                            (anexos_formulario['Codigo'].isin(codes)) & 
+                            (anexos_formulario['Documento'] == str(transp_num))
+                        ]
+                    elif 6 in codes: # Factura
+                        if campo == "52. Fecha Factura Comercial":
+                            fact_num = self.facturas_emparejadas.get(di_num)
+                            if fact_num:
+                                fact_norm = self._normalizar_factura(fact_num)
+                                indices_validos = []
+                                for idx, row in anexos_formulario[anexos_formulario['Codigo'].isin(codes)].iterrows():
+                                    if self._normalizar_factura(row['Documento']) == fact_norm:
+                                        indices_validos.append(idx)
+                                anexos = anexos_formulario.loc[indices_validos]
+                            else:
+                                anexos = pd.DataFrame() 
+                        else:
+                            anexos = anexos_formulario[anexos_formulario['Codigo'].isin(codes)]
+                    else:
+                        anexos = anexos_formulario[anexos_formulario['Codigo'].isin(codes)]
+                    
                     if anexos.empty: res['Datos Formulario'] = 'NO ENCONTRADO'
                     else:
                         if not config["cambia_por_declaracion"]:
@@ -1154,10 +1216,7 @@ class ValidadorDeclaracionImportacionCompleto:
             try:
                 with pd.ExcelWriter(archivo_salida, engine='openpyxl') as writer:
                     df.to_excel(writer, sheet_name='Validacion_Detallada', index=False)
-                
-                print("\n" + "="*50)
-                print("📊 RESUMEN FINAL DE VALIDACIÓN")
-                print("="*50)
+                print(f"\n{'='*50}\n📊 RESUMEN FINAL DE VALIDACIÓN\n{'='*50}")
                 print(f"   • Total declaraciones procesadas: {len(todas_decs)}")
                 print(f"   • Declaraciones con errores: {err_count}")
                 print(f"   • Declaraciones correctas: {len(todas_decs)-err_count}")
@@ -1166,11 +1225,12 @@ class ValidadorDeclaracionImportacionCompleto:
                     print(f"🎯 TODAS LAS {len(todas_decs)} DECLARACIONES SON CORRECTAS ✅")
                 else:
                     print(f"⚠️  {err_count} declaraciones requieren revisión")
-                
-                print(f"💾 Resultados guardados en: {archivo_salida}")
-                print("="*50)
 
+                print(f"💾 Resultados guardados en: {archivo_salida}")
+                print(f"{'='*50}")
                 return df
+            except PermissionError:
+                print(f"❌ Error: Permiso denegado al guardar {archivo_salida}. Cierre el archivo si está abierto.")
             except Exception as e: print(f"❌ Error al guardar Excel: {e}")
         return None
 
@@ -1185,14 +1245,14 @@ def main():
     
     try:
         print("🚀 INICIANDO PROCESO COMPLETO DE EXTRACCIÓN Y COMPARACIÓN INTEGRADO")
-        print("=" * 120)
+        print(f"{'='*120}")
         print(f"📁 Carpeta base: {CARPETA_BASE}")
         
         if not os.path.exists(CARPETA_BASE): print("❌ Carpeta no existe"); return
 
-        print("\n" + "="*60)
+        print(f"\n{'='*60}")
         print("📊 EJECUTANDO: Comparación DIM vs Subpartida")
-        print("="*60)
+        print(f"{'='*60}")
         
         print("\n📄 EXTRACCIÓN DE DATOS DE PDFs (DIAN)...")
         datos_dian = ExtractorDIANSimplificado().procesar_multiples_dis(CARPETA_BASE)
@@ -1210,27 +1270,26 @@ def main():
         else:
             print("❌ No se pudieron extraer datos de subpartidas")
 
-        print("\n🔍 COMPARANDO DATOS EXTRAÍDOS...")
         if datos_dian is not None and not datos_dian.empty and not datos_sub.empty:
+            print("\n🔍 COMPARANDO DATOS EXTRAÍDOS...")
             reporte_comp = ComparadorDatos().generar_reporte_comparacion(datos_dian, datos_sub, EXCEL_OUTPUT_COMPARACION)
         else: 
             print("❌ Datos insuficientes para comparación")
             reporte_comp = None
 
-        print("\n" + "="*60)
+        print(f"\n{'='*60}")
         print("📋 EJECUTANDO: Validación Anexos FMM vs DIM")
-        print("="*60)
+        print(f"{'='*60}")
         
         res_val = ValidadorDeclaracionImportacionCompleto().procesar_validacion_completa(CARPETA_BASE, EXCEL_OUTPUT_ANEXOS)
         
-        print("\n" + "="*120)
+        print(f"\n{'='*120}")
         print("🎯 PROCESO COMPLETADO EXITOSAMENTE")
-        print("="*120)
+        print(f"{'='*120}")
         
         print(f"\n📁 ARCHIVOS GENERADOS:")
         
         if reporte_comp is not None and not reporte_comp.empty:
-            # Filtrar filas reales para el conteo (excluir totales)
             conteo_real = len(reporte_comp[~reporte_comp['4. Número DI'].str.contains('VALORES ACUMULADOS', na=False)])
             print(f"   ✅ {EXCEL_OUTPUT_COMPARACION}")
             print(f"      • {conteo_real} DI procesadas")
