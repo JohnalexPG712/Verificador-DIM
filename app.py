@@ -611,6 +611,17 @@ def main():
     
     # Header principal
     st.title("Aplicación de Verificación DIM vs FMM - SmartDIM 🚀 ")
+
+    # Estilos para el sidebar: fuente y tamaño
+    st.markdown("""
+    <style>
+        /* Cambiar fuente y tamaño SOLO en el sidebar */
+        [data-testid="stSidebar"] {
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Instrucciones en sidebar
     with st.sidebar:
@@ -624,7 +635,7 @@ def main():
         """)
         
         # Botón de limpieza
-        if st.button("🧹 Limpiar Todo y Reiniciar", type="secondary", use_container_width=True):
+        if st.button("🧹 Limpiar y Reiniciar", type="secondary", use_container_width=True):
             # Limpiar todo el estado específico
             st.session_state.comparacion_data = None
             st.session_state.anexos_data = None
@@ -748,4 +759,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
