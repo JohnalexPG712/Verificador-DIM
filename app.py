@@ -686,10 +686,10 @@ def main():
     st.subheader("Archivo Excel (Subpartidas)")
     excel_subpartidas = st.file_uploader(
         "Arrastre y suelte Excel de subpartidas aquí",
-        type=['xlsx', 'xls'],
+        type=['xlsx'],
         key=f"excel_subpartidas_{current_key}"
     )
-    st.caption("Formatos soportados: XLSX, XLS")
+    st.caption("Formatos soportados: XLSX")
 
     if excel_subpartidas:
         st.markdown(f'<div class="file-info">📋 {excel_subpartidas.name} ({excel_subpartidas.size / 1024:.1f} KB)</div>', 
@@ -699,10 +699,10 @@ def main():
     st.subheader("Archivo Excel (Anexos FMM)")
     excel_anexos = st.file_uploader(
         "Arrastre y suelte Excel de anexos FMM aquí",
-        type=['xlsx', 'xls'],
+        type=['xlsx'],
         key=f"excel_anexos_{current_key}"
     )
-    st.caption("Formatos soportados: XLSX, XLS")
+    st.caption("Formatos soportados: XLSX")
 
     if excel_anexos:
         st.markdown(f'<div class="file-info">📋 {excel_anexos.name} ({excel_anexos.size / 1024:.1f} KB)</div>', 
@@ -760,6 +760,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
