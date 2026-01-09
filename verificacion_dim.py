@@ -854,7 +854,7 @@ class ValidadorDeclaracionImportacionCompleto:
             "132. No. Aceptación Declaración": [r"132\s*\.?\s*No\.?\s*Aceptaci[oó]n\s*declaraci[oó]n[\s\S]*?(\d{12,18})"],
             "133. Fecha Aceptación": [r"133\s*\.?\s*Fec*h?a:?\s*(\d{4}\s*[\-\s]*\d{2}\s*[\-\s]*\d{2}|\d{8})\b"],
             "134. Levante No.": [r"134\s*\.?\s*Levante\s*No\.?[\s\S]{0,300}?(\d{12,})"],
-            "135. Fecha Levante": [r"135\s*\.?\s*Fec*h?a[\s\S]*?([\d]{4}\s*-\s*[\d]{2}\s*-\s*[\d]{2})"]
+            "135. Fecha Levante": [r"134[\s\S]*?135\s*\.?\s*Fec*h?a[\s\S]{0,100}?(\d{4}\s*-\s*\d{2}\s*-\s*\d{2})"]
         }
         self.nit_proveedor = None
         self.nombre_proveedor = None
