@@ -129,13 +129,21 @@ class ExtractorDIANSimplificado:
             return np.nan
 
     def extraer_texto_pdf(self, pdf_path):
+        """
+        Versión corregida: Maneja excepciones por página para que una hoja
+        en blanco o corrupta no detenga la lectura completa del archivo.
+        """
         texto_completo = ""
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for pagina in pdf.pages:
-                    texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
-                    if texto:
-                        texto_completo += texto + "\n\n"
+                    try:
+                        texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
+                        if texto:
+                            texto_completo += texto + "\n\n"
+                    except Exception:
+                        # Si falla una página (ej. en blanco), continuamos con la siguiente
+                        continue
             return texto_completo
         except Exception:
             return ""
@@ -156,35 +164,45 @@ class ExtractorDIANSimplificado:
         return "NO ENCONTRADO"
 
     def extraer_multiples_di_de_texto(self, texto_completo, pdf_filename):
-        di_bloques = []
-        form_number_matches = []
+        """
+        Versión corregida: Agrupa el texto por Número de Formulario.
+        Si encuentra el mismo número en varias páginas, concatena el texto 
+        en lugar de crear un nuevo registro.
+        """
+        matches = []
         for patron in self.patrones["4. Número DI"]:
-            matches = list(re.finditer(patron, texto_completo, re.IGNORECASE | re.MULTILINE | re.DOTALL))
-            form_number_matches.extend(matches)
+            matches.extend(list(re.finditer(patron, texto_completo, re.IGNORECASE | re.MULTILINE | re.DOTALL)))
         
-        form_number_matches.sort(key=lambda m: m.start())
+        matches.sort(key=lambda m: m.start())
         
-        if not form_number_matches:
+        if not matches:
             form_num = self.extraer_campo(texto_completo, self.patrones["4. Número DI"], "4. Número DI")
             if form_num != "NO ENCONTRADO":
-                di_bloques.append({'form_number': form_num, 'text': texto_completo})
+                return [{'form_number': form_num, 'text': texto_completo}]
             else:
-                di_bloques.append({'form_number': "Desconocido_" + pdf_filename, 'text': texto_completo})
-            return di_bloques
+                return [{'form_number': "Desconocido_" + pdf_filename, 'text': texto_completo}]
 
-        unique_matches = []
-        last_end = -1
-        for match in form_number_matches:
-            if match.start() >= last_end:
-                unique_matches.append(match)
-                last_end = match.end()
+        # Diccionario para unificar DIs multipágina
+        di_dict = OrderedDict()
         
-        for i, match in enumerate(unique_matches):
+        puntos_corte = [m.start() for m in matches]
+        puntos_corte.append(len(texto_completo))
+        
+        for i, match in enumerate(matches):
             form_number = match.group(1).strip()
             start_index = match.start()
-            end_index = unique_matches[i+1].start() if i + 1 < len(unique_matches) else len(texto_completo)
+            end_index = puntos_corte[i+1]
+            
             di_text_block = texto_completo[start_index:end_index]
-            di_bloques.append({'form_number': form_number, 'text': di_text_block})
+            
+            # Si ya existe, concatenamos (es una continuación de la misma DI)
+            if form_number in di_dict:
+                di_dict[form_number] += "\n" + di_text_block
+            else:
+                di_dict[form_number] = di_text_block
+        
+        # Convertir a lista de bloques
+        di_bloques = [{'form_number': k, 'text': v} for k, v in di_dict.items()]
         return di_bloques
 
     def procesar_di_individual(self, di_text_block, form_number, pdf_filename):
@@ -450,7 +468,6 @@ class ComparadorDatos:
             di = emparejamiento['di']
             subpartida = emparejamiento['subpartida']
             numero_di = di.get("4. Número DI", "Desconocido")
-            # SILENCIADO: print(f"\n🔍 Procesando DI: {numero_di}")
             
             fila_reporte = {"4. Número DI": numero_di}
             
@@ -478,7 +495,6 @@ class ComparadorDatos:
                     emoji_sub = "✅" if coinciden else "❌"
                     fila_reporte[f"{campo_dian} DI"] = f"{emoji_di} {val_di_fmt}"
                     fila_reporte[f"{campo_dian} Subpartida"] = f"{emoji_sub} {val_sub_fmt}"
-                    # SILENCIADO: print(f"   📊 Subpartida - DI: {emoji_di} {val_di_fmt}, Excel: {emoji_sub} {val_sub_fmt}")
                 else:
                     fila_reporte[f"{campo_dian} DI"] = val_di_fmt
                     fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt
@@ -493,8 +509,6 @@ class ComparadorDatos:
                 fila_reporte[f"{campo_dian} DI"] = val_di_fmt if val_di_fmt != "N/A" else None
                 fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt if val_sub_fmt != "N/A" else None
                 
-                # SILENCIADO: print(f"   📦 Bultos - DI: {val_di_fmt}, Subpartida: {val_sub_fmt}")
-                
             for campo, (campo_dian, _) in self.campos_acumulables.items():
                 valor_dian = di.get(campo_dian, None)
                 valor_subpartida = subpartida.get(campo, None) if subpartida is not None else None
@@ -504,7 +518,6 @@ class ComparadorDatos:
             tiene_errores = self.determinar_resultado_final(di, subpartida if subpartida is not None else {}, multiples_subpartidas)
             fila_reporte["Resultado verificación"] = "❌ CON DIFERENCIAS" if tiene_errores else "✅ CONFORME"
             reporte_filas.append(fila_reporte)
-            # SILENCIADO: print(f"   {'❌' if tiene_errores else '✅'} DI: {numero_di} - {'CON DIFERENCIAS' if tiene_errores else 'CONFORME'}")
         
         if multiples_subpartidas:
             self._agregar_totales_multiples_subpartidas(reporte_filas, datos_dian, datos_subpartidas)
@@ -1002,19 +1015,42 @@ class ValidadorDeclaracionImportacionCompleto:
             print(f"❌ Error al extraer anexos: {e}"); return pd.DataFrame()
 
     def extraer_todas_declaraciones_pdf(self, pdf_path):
+        """
+        Versión corregida: Maneja hojas en blanco y unifica DIs multipágina.
+        """
         texto_completo = ""
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for pagina in pdf.pages:
-                    texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
-                    if texto: texto_completo += texto + "\n\n"
+                    try:
+                        texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
+                        if texto: texto_completo += texto + "\n\n"
+                    except: continue
         except: return []
         
+        # 1. Encontrar todos los números de formulario
         matches = list(re.finditer(r"4\s*\.?\s*N[uú]mero\s*de\s*formulario[\s\S]*?(\d{12,18})", texto_completo, re.IGNORECASE))
-        declaraciones = []
+        
+        declaraciones_dict = OrderedDict()
+        puntos_corte = [m.start() for m in matches]
+        puntos_corte.append(len(texto_completo))
+        
+        # 2. Agrupar bloques de texto por número de formulario
         for i, match in enumerate(matches):
-            end_pos = matches[i+1].start() if i < len(matches) - 1 else len(texto_completo)
-            declaraciones.append(self.extraer_datos_declaracion_individual(texto_completo[match.start():end_pos], match.group(1)))
+            numero_formulario = match.group(1).strip()
+            end_pos = puntos_corte[i+1]
+            bloque_texto = texto_completo[match.start():end_pos]
+            
+            if numero_formulario in declaraciones_dict:
+                declaraciones_dict[numero_formulario] += "\n" + bloque_texto
+            else:
+                declaraciones_dict[numero_formulario] = bloque_texto
+        
+        # 3. Procesar los textos unificados
+        declaraciones = []
+        for num_form, texto_unificado in declaraciones_dict.items():
+            declaraciones.append(self.extraer_datos_declaracion_individual(texto_unificado, num_form))
+            
         return declaraciones
 
     def extraer_datos_declaracion_individual(self, texto, numero_formulario):
