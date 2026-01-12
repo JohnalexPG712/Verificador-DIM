@@ -73,7 +73,10 @@ class ExtractorDIANSimplificado:
             ],
             "55. Cod. de Bandera": [r"55\s*\.\s*?C[oó]digo\s*de.*?\n(?:\s*\d+\s+){2}(\d+)"],
             "58. Tasa de Cambio": [r"58\s*\.?\s*Tasa\s*de\s*cambio\b(?:\s*\$?\s*cvs\.?)?[\s\S]{0,200}?([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2}))"],
-            "59. Subpartida Arancelaria": [r"59\s*\.?\s*Subpartida\s*arancelaria\s*\d+\s*\.\s*Cod\s*\.\s*\d+\s*\.\s*Cod\s*\.\s*\d+\s*\.\s*Cod\s*\.\s*Modalidad\s*\d+\s*\.\s*No\s*\.\s*cuotas\s*\d+\s*\.\s*Valor\s*cuota\s*USD\s*\d+\s*\.\s*Periodicidad\s*del\s*\d+\s*\.\s*Cod\s*\.\s*país\s*\d+\s*\.\s*Cod\s*\.\s*Acuerdo\s*([\d]{10})"],
+            "59. Subpartida Arancelaria": [
+                r"59\s*\.?\s*Subpartida\s*arancelaria\s*\d+\s*\.\s*Cod\s*\.\s*\d+\s*\.\s*Cod\s*\.\s*\d+\s*\.\s*Cod\s*\.\s*Modalidad\s*\d+\s*\.\s*No\s*\.\s*cuotas\s*\d+\s*\.\s*Valor\s*cuota\s*USD\s*\d+\s*\.\s*Periodicidad\s*del\s*\d+\s*\.\s*Cod\s*\.\s*país\s*\d+\s*\.\s*Cod\s*\.\s*Acuerdo\s*([\d]{10})",
+                r"59\s*\.?\s*Subpartida\s*arancelaria[\s\S]{0,150}?\b(\d{10})\b"
+            ],
             "62. Cod. Modalidad": [r"62\s*\.?\s*Cod\s*\.\s*Modalidad\s*(?:(?:.*?\n)|(?:(?:[:;.\-]|\s)+))[^\n]*?\b([A-Z]\d{3})\b"],
             "66. Cod. Pais de Origen": [r"66\s*\.?\s*Cod\s*\.\s*país[\s\S]*?\n.*?\n.*?\b(\d{3})\b"],
             "70. Cod. Pais Compra": [r"70\s*\.?\s*Cod\s*\.\s*país[\s\S]*?\n.*?\n.*?\b(\d{3})\b"],
