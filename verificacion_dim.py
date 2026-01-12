@@ -80,8 +80,8 @@ class ExtractorDIANSimplificado:
             "71. Peso Bruto kgs.": [r"71\s*\.?\s*Peso\s*bruto\s*kgs\s*\.?\s*dcms\s*\.?[\s\S]{0,500}?(\d{1,3}(?:\.\d{3})*\.\d{2})"],
             "72. Peso Neto kgs.": [r"72\s*\.?\s*Peso\s*neto\s*kgs\s*\.?\s*dcms\s*\.?[\s\S]{0,500}?\d{1,3}(?:\.\d{3})*\.\d{2}[\s\S]{0,100}?(\d{1,3}(?:\.\d{3})*\.\d{2})"],
             "74. Número de Bultos": [
-               r"(?is)(?:embalaje[\s\S]{0,200}?\b[A-Z]{2,3}\b[\s\S]{0,50}?(\d{1,3}(?:\.\d{3})*)|embalaje[\s\S]{0,80}?(\d{1,3}(?:\.\d{3})*))",
-               r"74\s*\.\s*?\s*No\s*\.\s*bultos[\s\S]*?embalaje\s+(\d+[\.,]?\d*)"
+               r"74\s*\.\s*?\s*No\s*\.\s*bultos[\s\S]*?embalaje\s+(\d+[\.,]?\d*)",
+               r"(?is)(?:embalaje[\s\S]{0,200}?\b[A-Z]{2,3}\b[\s\S]{0,50}?(\d{1,3}(?:\.\d{3})*)|embalaje[\s\S]{0,80}?(\d{1,3}(?:\.\d{3})*))" 
             ],
             "77. Cantidad dcms.": [r"77\s*\.?\s*Cantidad\s*dcms\.[\s\S]*?comercial\s+(\d{1,4}(?:\.\d{3})*\.\d{2})"],
             "78. Valor FOB USD": [r"78\s*\.?\s*Valor\s*FOB\s*USD[\s\S]*?\n\s*([\d.,]+)"],
