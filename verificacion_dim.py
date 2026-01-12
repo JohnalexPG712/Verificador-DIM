@@ -101,13 +101,17 @@ class ExtractorDIANSimplificado:
             return numero_str.strip()
 
         if '74. Número de Bultos' in campo_nombre:
-            cleaned_str = numero_str.replace(',', '.')
+            # 1. Eliminar los puntos completamente (asumimos que son miles: 7.333 -> 7333)
+            cleaned_str = numero_str.replace('.', '')
+            # 2. Reemplazar comas por puntos (por si hubiera decimales reales: 7,5 -> 7.5)
+            cleaned_str = cleaned_str.replace(',', '.')
+            # 3. Limpiar cualquier basura restante
             cleaned_str = re.sub(r'[^\d.]', '', cleaned_str)
             try:
                 valor = float(cleaned_str)
                 return valor
             except ValueError:
-                return np.nan
+                return np.nan          
 
         if any(codigo in campo_nombre for codigo in ['55. Cod. de Bandera', '66. Cod. Pais de Origen', '70. Cod. Pais Compra']):
             if numero_str.isdigit():
