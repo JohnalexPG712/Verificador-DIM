@@ -424,11 +424,22 @@ def procesar_conciliacion(dian_pdfs, excel_subpartidas, excel_anexos):
                 reporte_anexos = resultado_validacion
 
             # GUARDAR RESULTADOS EN SESSION_STATE - CLAVE PARA PERSISTENCIA
+            #with open(output_comparacion, "rb") as f:
+                #st.session_state.comparacion_data = f.read()
+            
+            #with open(output_anexos, "rb") as f:
+                #st.session_state.anexos_data = f.read()
+
             with open(output_comparacion, "rb") as f:
                 st.session_state.comparacion_data = f.read()
-            
-            with open(output_anexos, "rb") as f:
-                st.session_state.anexos_data = f.read()
+
+            if os.path.exists(output_anexos):
+                with open(output_anexos, "rb") as f:
+                    st.session_state.anexos_data = f.read()
+            else:
+                st.warning("⚠️ La validación de anexos no generó archivo Excel.")
+                st.session_state.anexos_data = None
+
             
             # Guardar también los DataFrames completos para mostrar resultados
             st.session_state.reporte_comparacion = reporte_comparacion
@@ -760,6 +771,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
