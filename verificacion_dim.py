@@ -69,9 +69,7 @@ class ExtractorDIANSimplificado:
             "4. Número DI": [
                 r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,16})",
                 r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?([\d\-]{15})",
-                r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)",
-                r"4\.\s*N[úu]mero[\s\S]{0,80}?(\d{9,11}\s*-\s*\d)"
-                
+                r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)"
             ],
             "55. Cod. de Bandera": [r"55\s*\.\s*?C[oó]digo\s*de.*?\n(?:\s*\d+\s+){2}(\d+)"],
             "58. Tasa de Cambio": [r"58\s*\.?\s*Tasa\s*de\s*cambio\b(?:\s*\$?\s*cvs\.?)?[\s\S]{0,200}?([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2}))"],
@@ -86,8 +84,7 @@ class ExtractorDIANSimplificado:
             "72. Peso Neto kgs.": [r"72\s*\.?\s*Peso\s*neto\s*kgs\s*\.?\s*dcms\s*\.?[\s\S]{0,500}?\d{1,3}(?:\.\d{3})*\.\d{2}[\s\S]{0,100}?(\d{1,3}(?:\.\d{3})*\.\d{2})"],
             "74. Número de Bultos": [
                r"74\s*\.\s*?\s*No\s*\.\s*bultos[\s\S]*?embalaje\s+(\d+[\.,]?\d*)",
-               r"(?is)(?:embalaje[\s\S]{0,200}?\b[A-Z]{2,3}\b[\s\S]{0,50}?(\d{1,3}(?:\.\d{3})*)|embalaje[\s\S]{0,80}?(\d{1,3}(?:\.\d{3})*))",
-               r"74\s*\.?\s*No\s*\.?\s*bultos\s*[:\.]?\s*(\d+[\.,]?\d*)" # Patrón de respaldo añadido
+               r"(?is)(?:embalaje[\s\S]{0,200}?\b[A-Z]{2,3}\b[\s\S]{0,50}?(\d{1,3}(?:\.\d{3})*)|embalaje[\s\S]{0,80}?(\d{1,3}(?:\.\d{3})*))" 
             ],
             "77. Cantidad dcms.": [r"77\s*\.?\s*Cantidad\s*dcms\.[\s\S]*?comercial\s+(\d{1,4}(?:\.\d{3})*\.\d{2})"],
             "78. Valor FOB USD": [r"78\s*\.?\s*Valor\s*FOB\s*USD[\s\S]*?\n\s*([\d.,]+)"],
@@ -104,8 +101,11 @@ class ExtractorDIANSimplificado:
             return numero_str.strip()
 
         if '74. Número de Bultos' in campo_nombre:
+            # 1. Eliminar los puntos completamente (asumimos que son miles: 7.333 -> 7333)
             cleaned_str = numero_str.replace('.', '')
+            # 2. Reemplazar comas por puntos (por si hubiera decimales reales: 7,5 -> 7.5)
             cleaned_str = cleaned_str.replace(',', '.')
+            # 3. Limpiar cualquier basura restante
             cleaned_str = re.sub(r'[^\d.]', '', cleaned_str)
             try:
                 valor = float(cleaned_str)
@@ -171,16 +171,7 @@ class ExtractorDIANSimplificado:
         
         form_number_matches.sort(key=lambda m: m.start())
         
-        # Filtrado simple de duplicados para esta clase también (por seguridad)
-        unique_matches = []
-        if form_number_matches:
-            unique_matches.append(form_number_matches[0])
-            for current in form_number_matches[1:]:
-                last = unique_matches[-1]
-                if current.start() > last.start() + 20:
-                    unique_matches.append(current)
-        
-        if not unique_matches:
+        if not form_number_matches:
             form_num = self.extraer_campo(texto_completo, self.patrones["4. Número DI"], "4. Número DI")
             if form_num != "NO ENCONTRADO":
                 di_bloques.append({'form_number': form_num, 'text': texto_completo})
@@ -188,8 +179,15 @@ class ExtractorDIANSimplificado:
                 di_bloques.append({'form_number': "Desconocido_" + pdf_filename, 'text': texto_completo})
             return di_bloques
 
+        unique_matches = []
+        last_end = -1
+        for match in form_number_matches:
+            if match.start() >= last_end:
+                unique_matches.append(match)
+                last_end = match.end()
+        
         for i, match in enumerate(unique_matches):
-            form_number = match.group(1).strip() if match.groups() else match.group(0).strip()
+            form_number = match.group(1).strip()
             start_index = match.start()
             end_index = unique_matches[i+1].start() if i + 1 < len(unique_matches) else len(texto_completo)
             di_text_block = texto_completo[start_index:end_index]
@@ -459,6 +457,7 @@ class ComparadorDatos:
             di = emparejamiento['di']
             subpartida = emparejamiento['subpartida']
             numero_di = di.get("4. Número DI", "Desconocido")
+            # SILENCIADO: print(f"\n🔍 Procesando DI: {numero_di}")
             
             fila_reporte = {"4. Número DI": numero_di}
             
@@ -486,6 +485,7 @@ class ComparadorDatos:
                     emoji_sub = "✅" if coinciden else "❌"
                     fila_reporte[f"{campo_dian} DI"] = f"{emoji_di} {val_di_fmt}"
                     fila_reporte[f"{campo_dian} Subpartida"] = f"{emoji_sub} {val_sub_fmt}"
+                    # SILENCIADO: print(f"   📊 Subpartida - DI: {emoji_di} {val_di_fmt}, Excel: {emoji_sub} {val_sub_fmt}")
                 else:
                     fila_reporte[f"{campo_dian} DI"] = val_di_fmt
                     fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt
@@ -500,6 +500,8 @@ class ComparadorDatos:
                 fila_reporte[f"{campo_dian} DI"] = val_di_fmt if val_di_fmt != "N/A" else None
                 fila_reporte[f"{campo_dian} Subpartida"] = val_sub_fmt if val_sub_fmt != "N/A" else None
                 
+                # SILENCIADO: print(f"   📦 Bultos - DI: {val_di_fmt}, Subpartida: {val_sub_fmt}")
+                
             for campo, (campo_dian, _) in self.campos_acumulables.items():
                 valor_dian = di.get(campo_dian, None)
                 valor_subpartida = subpartida.get(campo, None) if subpartida is not None else None
@@ -509,6 +511,7 @@ class ComparadorDatos:
             tiene_errores = self.determinar_resultado_final(di, subpartida if subpartida is not None else {}, multiples_subpartidas)
             fila_reporte["Resultado verificación"] = "❌ CON DIFERENCIAS" if tiene_errores else "✅ CONFORME"
             reporte_filas.append(fila_reporte)
+            # SILENCIADO: print(f"   {'❌' if tiene_errores else '✅'} DI: {numero_di} - {'CON DIFERENCIAS' if tiene_errores else 'CONFORME'}")
         
         if multiples_subpartidas:
             self._agregar_totales_multiples_subpartidas(reporte_filas, datos_dian, datos_subpartidas)
@@ -536,9 +539,10 @@ class ComparadorDatos:
             
         valor_bultos_di_consolidado = 0
         if '74. Número de Bultos' in datos_dian.columns:
-            # === CORRECCIÓN SUMA TOTALES ===
-            s_bultos = pd.to_numeric(datos_dian['74. Número de Bultos'], errors='coerce').fillna(0)
-            valor_bultos_di_consolidado = s_bultos.sum()
+            s_bultos = pd.to_numeric(datos_dian['74. Número de Bultos'], errors='coerce')
+            unicos = s_bultos.dropna().unique()
+            if len(unicos) > 0:
+                valor_bultos_di_consolidado = unicos[0]
         
         valor_bultos_excel_suma = totales_subpartidas.get('numero_bultos', 0)
         
@@ -616,9 +620,9 @@ class ComparadorDatos:
 
         valor_bultos_di_consolidado = 0
         if '74. Número de Bultos' in datos_dian.columns:
-            # === CORRECCIÓN SUMA TOTALES ===
-            s_bultos = pd.to_numeric(datos_dian['74. Número de Bultos'], errors='coerce').fillna(0)
-            valor_bultos_di_consolidado = s_bultos.sum()
+            s_bultos = pd.to_numeric(datos_dian['74. Número de Bultos'], errors='coerce')
+            unicos = s_bultos.dropna().unique()
+            if len(unicos) > 0: valor_bultos_di_consolidado = unicos[0]
             
         valor_bultos_excel = 0
         if fila_subpartida is not None:
@@ -1010,52 +1014,14 @@ class ValidadorDeclaracionImportacionCompleto:
             with pdfplumber.open(pdf_path) as pdf:
                 for pagina in pdf.pages:
                     texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
-                    if texto and len(texto.strip()) > 50: 
-                        texto_completo += texto + "\n\n---PAGE_BREAK---\n\n"
-        except: 
-            return []
-            
-        PATRONES_NUMERO_DI = [
-            r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,16})",
-            r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?([\d\-]{15})",
-            r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)",
-            r"4\.\s*N[úu]mero[\s\S]{0,80}?(\d{9,11}\s*-\s*\d)"
-        ]
-    
-        matches = []
-        for patron in PATRONES_NUMERO_DI:
-            for m in re.finditer(patron, texto_completo, re.IGNORECASE):
-                matches.append(m)
-    
-        # Ordenar por posición real en el texto
-        matches.sort(key=lambda m: m.start())
+                    if texto: texto_completo += texto + "\n\n"
+        except: return []
         
-        # === CORRECCIÓN FILTRADO DUPLICADOS ===
-        unique_matches = []
-        if matches:
-            unique_matches.append(matches[0])
-            for current in matches[1:]:
-                last = unique_matches[-1]
-                if current.start() > last.start() + 20: # Margen para evitar solapamiento
-                    unique_matches.append(current)
-    
+        matches = list(re.finditer(r"4\s*\.?\s*N[uú]mero\s*de\s*formulario[\s\S]*?(\d{12,18})", texto_completo, re.IGNORECASE))
         declaraciones = []
-        for i, match in enumerate(unique_matches):
-            end_pos = unique_matches[i + 1].start() if i < len(unique_matches) - 1 else len(texto_completo)
-            bloque = texto_completo[match.start():end_pos]
-            
-            # Recuperar el número capturado en cualquier grupo
-            numero_crudo = None
-            for g in match.groups():
-                if g:
-                    numero_crudo = g
-                    break
-            if not numero_crudo: numero_crudo = match.group(0)
-
-            declaraciones.append(
-                self.extraer_datos_declaracion_individual(bloque, numero_crudo)
-            )
-    
+        for i, match in enumerate(matches):
+            end_pos = matches[i+1].start() if i < len(matches) - 1 else len(texto_completo)
+            declaraciones.append(self.extraer_datos_declaracion_individual(texto_completo[match.start():end_pos], match.group(1)))
         return declaraciones
 
     def extraer_datos_declaracion_individual(self, texto, numero_formulario):
@@ -1280,26 +1246,17 @@ class ValidadorDeclaracionImportacionCompleto:
 # =============================================================================
 
 def main():
-    print("🚀 INICIANDO PROCESO DE VERIFICACIÓN")
-    print(f"{'='*60}")
-    
-    # === CORRECCIÓN RUTA DINÁMICA ===
-    print("Por favor, pega la ruta de la carpeta donde están los archivos:")
-    ruta_usuario = input("Ruta > ").strip()
-    
-    # Eliminar comillas si el usuario copió la ruta como "C:\Ruta"
-    CARPETA_BASE = ruta_usuario.replace('"', '').replace("'", "")
-    
-    if not CARPETA_BASE or not os.path.exists(CARPETA_BASE):
-        print("❌ La ruta ingresada no existe o está vacía. Usando directorio actual...")
-        CARPETA_BASE = os.getcwd()
-    
+    CARPETA_BASE = r"E:\Users\Lenovo\Desktop\PYTHON\DI\Junior Deposito 401\SLIND 401\SLIND 401\SLI 850232"
     EXCEL_OUTPUT_COMPARACION = os.path.join(CARPETA_BASE, "Resultado Validación Subpartida vs DIM.xlsx")
     EXCEL_OUTPUT_ANEXOS = os.path.join(CARPETA_BASE, "Resultado Validacion Anexos FMM vs DIM.xlsx")
     
     try:
-        print(f"📂 Trabajando en: {CARPETA_BASE}")
+        print("🚀 INICIANDO PROCESO COMPLETO DE EXTRACCIÓN Y COMPARACIÓN INTEGRADO")
+        print(f"{'='*120}")
+        print(f"📁 Carpeta base: {CARPETA_BASE}")
         
+        if not os.path.exists(CARPETA_BASE): print("❌ Carpeta no existe"); return
+
         print(f"\n{'='*60}")
         print("📊 EJECUTANDO: Comparación DIM vs Subpartida")
         print(f"{'='*60}")
@@ -1337,6 +1294,8 @@ def main():
         print("🎯 PROCESO COMPLETADO EXITOSAMENTE")
         print(f"{'='*120}")
         
+        print(f"\n📁 ARCHIVOS GENERADOS:")
+        
         if reporte_comp is not None and not reporte_comp.empty:
             conteo_real = len(reporte_comp[~reporte_comp['4. Número DI'].str.contains('VALORES ACUMULADOS', na=False)])
             print(f"   ✅ {EXCEL_OUTPUT_COMPARACION}")
@@ -1345,13 +1304,15 @@ def main():
         if res_val is not None:
              print(f"   ✅ {EXCEL_OUTPUT_ANEXOS}")
              print(f"      • Validación de anexos completada")
-        
-        input("\nPresiona ENTER para finalizar...")
 
+        print(f"\n📊 RESUMEN EJECUCIÓN:")
+        print(f"   • Comparación DIM vs Subpartida: {'✅ COMPLETADO' if reporte_comp is not None else '❌ ERROR'}")
+        print(f"   • Validación Anexos FMM: {'✅ COMPLETADO' if res_val is not None else '❌ ERROR'}")
+
+            
     except Exception as e:
         print(f"❌ Error general: {e}")
         import traceback; traceback.print_exc()
-        input("\nPresiona ENTER para salir...")
 
 if __name__ == "__main__":
     main()
