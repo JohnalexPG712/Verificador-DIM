@@ -1018,7 +1018,8 @@ class ValidadorDeclaracionImportacionCompleto:
                     texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
                    if texto and len(texto.strip()) > 50: # Filtro mínimo para ignorar hojas "casi" en blanco
                     texto_completo += texto + "\n\n---PAGE_BREAK---\n\n"
-        except: return []
+        except: 
+            return []
             
         PATRONES_NUMERO_DI = [
             r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,16})",
