@@ -1016,15 +1016,50 @@ class ValidadorDeclaracionImportacionCompleto:
             with pdfplumber.open(pdf_path) as pdf:
                 for pagina in pdf.pages:
                     texto = pagina.extract_text(x_tolerance=3, y_tolerance=3)
-                    if texto: texto_completo += texto + "\n\n"
+                   if texto and len(texto.strip()) > 50: # Filtro mínimo para ignorar hojas "casi" en blanco
+                    texto_completo += texto + "\n\n---PAGE_BREAK---\n\n"
         except: return []
-        
-        matches = list(re.finditer(r"4\s*\.?\s*N[uú]mero\s*de\s*formulario[\s\S]*?(\d{12,18})", texto_completo, re.IGNORECASE))
+            
+        PATRONES_NUMERO_DI = [
+            r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,16})",
+            r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?([\d\-]{15})",
+            r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)",
+            r"4\.\s*N[úu]mero[\s\S]{0,80}?(\d{9,11}\s*-\s*\d)"
+        ]
+    
+        matches = []
+    
+        # Buscar todos los posibles inicios de declaración
+        for patron in PATRONES_NUMERO_DI:
+            for m in re.finditer(patron, texto_completo, re.IGNORECASE):
+                matches.append(m)
+    
+        # Ordenar por posición real en el texto
+        matches.sort(key=lambda m: m.start())
+    
         declaraciones = []
+    
         for i, match in enumerate(matches):
-            end_pos = matches[i+1].start() if i < len(matches) - 1 else len(texto_completo)
-            declaraciones.append(self.extraer_datos_declaracion_individual(texto_completo[match.start():end_pos], match.group(1)))
+            end_pos = matches[i + 1].start() if i < len(matches) - 1 else len(texto_completo)
+    
+            bloque = texto_completo[match.start():end_pos]
+    
+            numero_crudo = match.group(1)
+    
+            declaraciones.append(
+                self.extraer_datos_declaracion_individual(
+                    bloque,
+                    numero_crudo
+                )
+            )
+    
         return declaraciones
+        #matches = list(re.finditer(r"4\s*\.?\s*N[uú]mero\s*de\s*formulario[\s\S]*?(\d{12,18})", texto_completo, re.IGNORECASE))
+        declaraciones = []
+        #for i, match in enumerate(matches):
+            #end_pos = matches[i+1].start() if i < len(matches) - 1 else len(texto_completo)
+            #declaraciones.append(self.extraer_datos_declaracion_individual(texto_completo[match.start():end_pos], match.group(1)))
+        #return declaraciones
 
     def extraer_datos_declaracion_individual(self, texto, numero_formulario):
         datos = {'Numero_Formulario_Declaracion': numero_formulario, 'Archivo_PDF': os.path.basename(texto.split('\n')[0]) if texto else 'Desconocido'}
