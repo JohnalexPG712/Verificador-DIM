@@ -69,7 +69,8 @@ class ExtractorDIANSimplificado:
             "4. Número DI": [
                 r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,16})",
                 r"(?:^|\n)\s*4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?([\d\-]{15})",
-                r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)"
+                r"4\s*\.?\s*N[úu]mero\s*de\s*formulario\s*[:\-]?\s*(\d{17}(?:-\d)?)",
+                r"4\s*\.?\s*N[úu]mero\s*de\s*formulario[\s\S]*?(\d{15,17})(?:-\d)?"
             ],
             "55. Cod. de Bandera": [r"55\s*\.\s*?C[oó]digo\s*de.*?\n(?:\s*\d+\s+){2}(\d+)"],
             "58. Tasa de Cambio": [r"58\s*\.?\s*Tasa\s*de\s*cambio\b(?:\s*\$?\s*cvs\.?)?[\s\S]{0,200}?([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2}))"],
